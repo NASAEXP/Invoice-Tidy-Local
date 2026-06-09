@@ -1,0 +1,14 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "invoice-tidy-desktop",
+  "assetdir": "frontend/src",
+  "author": {
+    "name": "Invoice Tidy",
+    "email": "support@invoicetidy.com"
+  },
+  "info": {
+    "productName": "Invoice Tidy Local",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright 2026"
+  }
+}

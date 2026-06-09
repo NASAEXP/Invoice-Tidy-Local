@@ -1,0 +1,29 @@
+Invoice Tidy Local
+Copyright 2026 Invoice Tidy
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This software downloads and/or bundles third-party components at setup time.
+Each component remains under its own license:
+
+  - IBM Granite Docling 258M (ibm-granite/granite-docling-258M)
+      Apache License 2.0
+  - Docling (docling-project/docling)
+      MIT License
+  - RapidOCR + PaddleOCR PP-OCRv4 models
+      Apache License 2.0
+  - PyTorch (pytorch/pytorch)
+      BSD 3-Clause License
+  - Hugging Face Transformers
+      Apache License 2.0
+  - FastAPI / Uvicorn / Pydantic
+      MIT License
+  - Wails (wailsapp/wails)
+      MIT License
+  - Alpine.js
+      MIT License
+  - Tailwind CSS
+      MIT License
+
+Model weights are downloaded on first run and are NOT distributed in this
+repository. Refer to each upstream project for full license terms.

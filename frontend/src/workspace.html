@@ -1,0 +1,556 @@
+<!doctype html>
+<!--
+Invoice Tidy UI handoff copy
+Source: app/local/page.tsx and Electron local app shell
+Purpose: Send this one file to a web chat model for redesign.
+Do not remove these workflow pieces in redesign:
+- local desktop status and parser readiness
+- upload/drop zone
+- extraction mode selector
+- processing queue status
+- invoice table with fields and confidence
+- field settings panel
+- export controls
+- compatibility/model status
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Invoice Tidy Handoff - Local Desktop Screen</title>
+
+  <link href="vendor/tailwind.css" rel="stylesheet">
+  <link href="index.css" rel="stylesheet">
+
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }
+
+    #sidebar.sidebar-collapsed .sidebar-text {
+      opacity: 0; width: 0; overflow: hidden; white-space: nowrap;
+      transition: opacity 0.2s ease, width 0.2s ease;
+      pointer-events: none; position: absolute;
+    }
+    #sidebar:not(.sidebar-collapsed) .sidebar-text {
+      opacity: 1; width: auto; position: static;
+      transition: opacity 0.25s ease 0.1s;
+    }
+    #sidebar.sidebar-collapsed nav a,
+    #sidebar.sidebar-collapsed nav button { justify-content: center; padding-left: 0; padding-right: 0; }
+    #sidebar.sidebar-collapsed nav a > div,
+    #sidebar.sidebar-collapsed nav button { justify-content: center; }
+    #sidebar.sidebar-collapsed .sidebar-status-card { display: none; }
+    #sidebar.sidebar-collapsed .sidebar-section-label { display: none; }
+    #sidebar.sidebar-collapsed #sidebar-header { justify-content: center; padding: 1rem; }
+    #sidebar.sidebar-collapsed #sidebar-footer > div { justify-content: center; }
+
+    .sidebar-handle {
+      position: absolute; top: 50%; right: -14px; transform: translateY(-50%); z-index: 20;
+      width: 28px; height: 28px; border-radius: 50%; background: white;
+      border: 1px solid #D1D7DC; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 2px 0 8px rgba(0,0,0,0.06);
+      transition: all 0.25s ease; color: #5C6470;
+    }
+    .sidebar-handle:hover {
+      background: #f2f8f8; border-color: #0c5c5e; color: #094C4F;
+      box-shadow: 2px 0 12px rgba(9,76,79,0.12); transform: translateY(-50%) scale(1.1);
+    }
+    .sidebar-handle svg { width: 14px; height: 14px; transition: transform 0.3s ease; }
+    #sidebar.sidebar-collapsed .sidebar-handle svg { transform: rotate(180deg); }
+
+    .switch-track {
+      width: 34px; height: 20px; border-radius: 99px; position: relative; cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .switch-track.on { background: #094C4F; }
+    .switch-track.off { background: #D1D7DC; }
+    .switch-track::after {
+      content: ""; width: 14px; height: 14px; border-radius: 99px; background: #fff;
+      position: absolute; top: 3px; transition: left 0.2s ease;
+    }
+    .switch-track.on::after { left: 17px; }
+    .switch-track.off::after { left: 3px; }
+  </style>
+</head>
+<body class="bg-flowly-bg text-flowly-textMain font-sans h-screen w-screen overflow-hidden antialiased flex">
+
+  <!-- Toast -->
+  <div id="toast" class="fixed top-8 left-1/2 transform -translate-x-1/2 z-50 bg-[#101828] text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-[-20px] pointer-events-none">
+    <svg class="w-5 h-5 text-spruce-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+    <span id="toast-message" class="text-xs font-semibold">Action completed</span>
+  </div>
+
+  <div class="w-full h-full bg-flowly-bg flex overflow-hidden">
+
+    <!-- LEFT SIDEBAR -->
+    <aside id="sidebar" class="w-64 bg-white border-r border-flowly-border flex flex-col flex-shrink-0 z-10 transition-all duration-300 ease-in-out relative">
+      <button onclick="toggleSidebar()" class="sidebar-handle" aria-label="Toggle sidebar">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+      </button>
+
+      <div class="flex-1 flex flex-col min-h-0">
+        <!-- Logo -->
+        <div class="p-6 flex items-center justify-between border-b border-flowly-border transition-all duration-300" id="sidebar-header">
+          <div class="flex items-center gap-2.5 overflow-hidden">
+            <div class="w-9 h-9 flex-shrink-0 rounded-xl bg-spruce-700 flex items-center justify-center shadow-md shadow-spruce-700/10 text-white font-black">
+              <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a4 4 0 014 4v2a4 4 0 01-4 4 4 4 0 01-4-4V6a4 4 0 014-4zm0 10a4 4 0 014 4v2a4 4 0 01-4 4 4 4 0 01-4-4v-2a4 4 0 014-4zm-6-2a4 4 0 014-4H8a4 4 0 01-4 4 4 4 0 014 4h2a4 4 0 01-4-4zm12 0a4 4 0 014-4h-2a4 4 0 01-4 4 4 4 0 014 4h2a4 4 0 01-4-4z"/></svg>
+            </div>
+            <div class="sidebar-text transition-opacity duration-300">
+              <span class="font-extrabold text-flowly-textMain text-sm tracking-tight block leading-none">Invoice Tidy Local</span>
+              <span class="text-[9px] text-spruce-700 font-bold tracking-widest uppercase mt-1 block">Private Desktop</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parser status card -->
+        <div class="sidebar-status-card px-4 py-4 border-b border-flowly-border bg-slate-50">
+          <div class="p-3 rounded-xl border border-flowly-border/70 bg-white space-y-2.5">
+            <div class="flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2 text-flowly-textMuted font-medium">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                Parser
+              </div>
+              <span class="font-bold text-flowly-textMain">Ready</span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-flowly-textMuted font-medium">Models</span>
+              <span class="font-bold text-flowly-textMain">Included</span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-flowly-textMuted font-medium">Storage</span>
+              <span class="text-[10px] font-bold text-spruce-700 bg-spruce-50 border border-spruce-100 px-1.5 py-0.5 rounded">Local only</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nav -->
+        <nav class="p-3 space-y-6 flex-1 overflow-y-auto">
+          <div>
+            <span class="sidebar-section-label text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest px-3 block mb-2">Workspace</span>
+            <div class="space-y-0.5">
+              <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg bg-spruce-50 text-spruce-700 hover:bg-spruce-100/50 font-bold text-xs transition-all border-l-2 border-spruce-700 shadow-2xs group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-spruce-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                  <span class="sidebar-text">Invoices</span>
+                </div>
+                <span class="font-mono text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-spruce-200/50 text-spruce-700 sidebar-text">23</span>
+              </a>
+              <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg text-flowly-textMuted hover:bg-spruce-50/40 hover:text-spruce-700 transition-all text-xs font-semibold group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-slate-400 group-hover:text-spruce-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                  <span class="sidebar-text">Fields</span>
+                </div>
+              </a>
+              <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg text-flowly-textMuted hover:bg-spruce-50/40 hover:text-spruce-700 transition-all text-xs font-semibold group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-slate-400 group-hover:text-spruce-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+                  <span class="sidebar-text">Exports</span>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <div>
+            <span class="sidebar-section-label text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest px-3 block mb-2">System</span>
+            <div class="space-y-0.5">
+              <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg text-flowly-textMuted hover:bg-spruce-50/40 hover:text-spruce-700 transition-all text-xs font-semibold group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-slate-400 group-hover:text-spruce-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                  <span class="sidebar-text">Compatibility</span>
+                </div>
+              </a>
+              <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg text-flowly-textMuted hover:bg-spruce-50/40 hover:text-spruce-700 transition-all text-xs font-semibold group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-slate-400 group-hover:text-spruce-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                  <span class="sidebar-text">Settings</span>
+                </div>
+              </a>
+            </div>
+          </div>
+        </nav>
+      </div>
+
+      <!-- Footer -->
+      <div class="p-4 border-t border-flowly-border bg-slate-50 transition-all duration-300" id="sidebar-footer">
+        <div class="flex items-center gap-2.5 p-1.5 rounded-xl overflow-hidden">
+          <div class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0"></div>
+          <span class="text-[10px] text-flowly-textMuted font-semibold sidebar-text">Desktop app &middot; All data stays local</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CENTER CONTENT -->
+    <main class="flex-1 flex flex-col overflow-hidden min-w-0 bg-flowly-bg">
+
+      <!-- HEADER -->
+      <header class="h-16 bg-white border-b border-flowly-border px-6 flex items-center justify-between flex-shrink-0">
+        <div>
+          <div class="flex items-center gap-1 text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest leading-none mb-1">
+            <span>Local Desktop</span>
+            <svg class="w-2 h-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+            <span class="text-spruce-700">Invoice Workspace</span>
+          </div>
+          <h1 class="text-sm font-bold text-flowly-textMain tracking-tight leading-none flex items-center gap-2">
+            Local invoice workspace
+            <span class="text-[11px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-flowly-border">Process files on this computer</span>
+          </h1>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="triggerToast('Opening folder...')" class="px-3 py-2 bg-white hover:bg-spruce-50 hover:text-spruce-700 hover:border-spruce-200 text-flowly-textMuted border border-flowly-border text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path></svg>
+            Open folder
+          </button>
+          <button onclick="triggerToast('Exporting approved invoices to CSV...')" class="px-4 py-2 bg-spruce-700 hover:bg-spruce-800 hover:shadow-lg hover:shadow-spruce-700/20 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+            Export approved
+          </button>
+        </div>
+      </header>
+
+      <!-- SCROLLABLE CONTENT -->
+      <section class="flex-1 overflow-y-auto p-6 space-y-5">
+
+        <!-- Drop zone -->
+        <div class="bg-white rounded-2xl border-2 border-dashed border-flowly-border hover:border-spruce-300 transition-all p-6 flex items-center justify-between gap-6">
+          <div>
+            <h2 class="text-base font-extrabold text-flowly-textMain tracking-tight flex items-center gap-2">
+              <svg class="w-5 h-5 text-spruce-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+              Drop invoice PDFs or images here
+            </h2>
+            <p class="text-[11px] text-flowly-textMuted font-medium mt-1.5">PDF, PNG, and JPG files stay on this machine. Duplicate checks run after extraction.</p>
+          </div>
+          <div class="flex flex-col gap-2.5 min-w-[220px]">
+            <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest">Extraction mode</span>
+            <div class="flex bg-slate-200/70 p-1 rounded-xl border border-flowly-border/70">
+              <button id="mode-light" onclick="setMode('light')" class="mode-btn flex-1 px-4 py-1.5 text-xs font-bold rounded-lg bg-spruce-700 text-white shadow-3xs transition-all">Light</button>
+              <button id="mode-standard" onclick="setMode('standard')" class="mode-btn flex-1 px-4 py-1.5 text-xs font-bold rounded-lg text-flowly-textMuted hover:text-spruce-700 transition-all">Standard</button>
+            </div>
+            <button class="px-4 py-2 bg-spruce-700 hover:bg-spruce-800 hover:shadow-lg hover:shadow-spruce-700/20 text-white text-xs font-bold rounded-xl transition-all">Choose files</button>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-4 gap-4">
+          <div class="bg-white rounded-xl border border-flowly-border p-4 hover:border-spruce-200 transition-colors">
+            <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest block">Queued</span>
+            <span class="text-2xl font-extrabold text-flowly-textMain block mt-1.5 tracking-tight font-mono">4</span>
+          </div>
+          <div class="bg-white rounded-xl border border-flowly-border p-4 hover:border-spruce-200 transition-colors">
+            <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest block">Needs review</span>
+            <span class="text-2xl font-extrabold text-amber-600 block mt-1.5 tracking-tight font-mono">7</span>
+          </div>
+          <div class="bg-white rounded-xl border border-flowly-border p-4 hover:border-spruce-200 transition-colors">
+            <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest block">Approved</span>
+            <span class="text-2xl font-extrabold text-spruce-700 block mt-1.5 tracking-tight font-mono">12</span>
+          </div>
+          <div class="bg-white rounded-xl border border-flowly-border p-4 hover:border-spruce-200 transition-colors">
+            <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest block">Exported</span>
+            <span class="text-2xl font-extrabold text-flowly-textMain block mt-1.5 tracking-tight font-mono">31</span>
+          </div>
+        </div>
+
+        <!-- Invoice table -->
+        <div class="bg-white rounded-2xl border border-flowly-border shadow-md overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-flowly-border flex items-center justify-between bg-slate-50">
+            <span class="text-xs font-bold text-flowly-textMain">Current batch</span>
+            <button onclick="triggerToast('Clearing exported rows...')" class="px-3 py-1.5 bg-white hover:bg-spruce-50 text-flowly-textMuted hover:text-spruce-700 border border-flowly-border hover:border-spruce-200 text-[11px] font-semibold rounded-lg transition-all">Clear exported</button>
+          </div>
+
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 border-b border-flowly-border text-flowly-textMuted font-bold uppercase text-[9px] tracking-wider">
+              <tr>
+                <th class="p-3">File</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Fields</th>
+                <th class="p-3">Engine</th>
+                <th class="p-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-flowly-border">
+              <!-- Row 1: Needs review -->
+              <tr class="hover:bg-spruce-50/30 transition-colors">
+                <td class="p-3">
+                  <span class="font-bold text-flowly-textMain block">acme-office-supplies-INV-1042.pdf</span>
+                  <span class="text-[10px] text-flowly-textMuted font-medium mt-0.5 block">Added 09:10</span>
+                </td>
+                <td class="p-3">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    Needs review
+                  </span>
+                </td>
+                <td class="p-3">
+                  <div class="space-y-1 text-[11px]">
+                    <div class="text-flowly-textMuted font-medium">Vendor: <span class="font-semibold text-flowly-textMain">Acme Office Supplies</span></div>
+                    <div class="text-flowly-textMuted font-medium">Total: <span class="font-mono font-bold text-flowly-textMain">$482.10</span></div>
+                    <div class="text-flowly-textMuted font-medium">Due: <span class="font-semibold text-flowly-textMain">May 29, 2026</span></div>
+                  </div>
+                </td>
+                <td class="p-3">
+                  <span class="text-[11px] text-flowly-textMuted font-medium block">Docling local OCR/layout</span>
+                  <span class="text-[10px] font-mono font-bold text-spruce-700 bg-spruce-50 border border-spruce-100 px-1.5 py-0.5 rounded mt-1 inline-block">light</span>
+                </td>
+                <td class="p-3 text-right">
+                  <button class="px-3 py-1.5 bg-spruce-700 hover:bg-spruce-800 text-white text-[11px] font-bold rounded-lg transition-all">Review</button>
+                </td>
+              </tr>
+              <!-- Row 2: Needs review -->
+              <tr class="hover:bg-spruce-50/30 transition-colors">
+                <td class="p-3">
+                  <span class="font-bold text-flowly-textMain block">northwind-logistics-scan.jpg</span>
+                  <span class="text-[10px] text-flowly-textMuted font-medium mt-0.5 block">Added 09:14</span>
+                </td>
+                <td class="p-3">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    Needs review
+                  </span>
+                </td>
+                <td class="p-3">
+                  <div class="space-y-1 text-[11px]">
+                    <div class="text-flowly-textMuted font-medium">Vendor: <span class="font-semibold text-flowly-textMain">Northwind Logistics</span></div>
+                    <div class="text-flowly-textMuted font-medium">Total: <span class="font-mono font-bold text-flowly-textMain">$1,260.00</span></div>
+                    <div class="text-flowly-textMuted font-medium">Invoice #: <span class="text-slate-500 font-bold bg-slate-100 border border-flowly-border px-1 py-0.5 rounded text-[10px]">missing</span></div>
+                  </div>
+                </td>
+                <td class="p-3">
+                  <span class="text-[11px] text-flowly-textMuted font-medium block">Docling local OCR/layout</span>
+                  <span class="text-[10px] font-mono font-bold text-spruce-700 bg-spruce-50 border border-spruce-100 px-1.5 py-0.5 rounded mt-1 inline-block">light</span>
+                </td>
+                <td class="p-3 text-right">
+                  <button class="px-3 py-1.5 bg-spruce-700 hover:bg-spruce-800 text-white text-[11px] font-bold rounded-lg transition-all">Review</button>
+                </td>
+              </tr>
+              <!-- Row 3: Processing -->
+              <tr class="hover:bg-spruce-50/30 transition-colors">
+                <td class="p-3">
+                  <span class="font-bold text-flowly-textMain block">riverbend-statement.pdf</span>
+                  <span class="text-[10px] text-flowly-textMuted font-medium mt-0.5 block">Added 09:20</span>
+                </td>
+                <td class="p-3">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Processing
+                  </span>
+                </td>
+                <td class="p-3">
+                  <div class="space-y-1 text-[11px]">
+                    <div class="text-flowly-textMuted font-medium">OCR running</div>
+                    <div class="text-flowly-textMuted font-medium">Duplicate check pending</div>
+                  </div>
+                </td>
+                <td class="p-3">
+                  <span class="text-[11px] text-flowly-textMuted font-medium block">Docling local OCR/layout</span>
+                  <span class="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 border border-flowly-border px-1.5 py-0.5 rounded mt-1 inline-block">standard</span>
+                </td>
+                <td class="p-3 text-right">
+                  <span class="font-mono text-[10px] font-semibold text-flowly-textMuted">Queued</span>
+                </td>
+              </tr>
+              <!-- Row 4: Approved -->
+              <tr class="hover:bg-spruce-50/30 transition-colors">
+                <td class="p-3">
+                  <span class="font-bold text-flowly-textMain block">fabrikam-cloud-april.pdf</span>
+                  <span class="text-[10px] text-flowly-textMuted font-medium mt-0.5 block">Added 09:17</span>
+                </td>
+                <td class="p-3">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Approved
+                  </span>
+                </td>
+                <td class="p-3">
+                  <div class="space-y-1 text-[11px]">
+                    <div class="text-flowly-textMuted font-medium">Vendor: <span class="font-semibold text-flowly-textMain">Fabrikam Cloud</span></div>
+                    <div class="text-flowly-textMuted font-medium">Total: <span class="font-mono font-bold text-flowly-textMain">$315.44</span></div>
+                    <div class="text-spruce-700 font-bold">Ready for CSV</div>
+                  </div>
+                </td>
+                <td class="p-3">
+                  <span class="text-[11px] text-flowly-textMuted font-medium block">Docling local OCR/layout</span>
+                  <span class="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 border border-flowly-border px-1.5 py-0.5 rounded mt-1 inline-block">standard</span>
+                </td>
+                <td class="p-3 text-right">
+                  <button class="px-3 py-1.5 bg-white hover:bg-spruce-50 text-flowly-textMuted hover:text-spruce-700 border border-flowly-border hover:border-spruce-200 text-[11px] font-semibold rounded-lg transition-all">Reopen</button>
+                </td>
+              </tr>
+              <!-- Row 5: Failed -->
+              <tr class="hover:bg-spruce-50/30 transition-colors">
+                <td class="p-3">
+                  <span class="font-bold text-flowly-textMain block">bad-scan-004.png</span>
+                  <span class="text-[10px] text-flowly-textMuted font-medium mt-0.5 block">Added 09:22</span>
+                </td>
+                <td class="p-3">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 text-red-600 border border-red-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                    Failed
+                  </span>
+                </td>
+                <td class="p-3">
+                  <div class="space-y-1 text-[11px]">
+                    <div class="text-flowly-textMuted font-medium">Text unreadable</div>
+                    <div class="text-slate-500 font-bold bg-slate-100 border border-flowly-border px-1.5 py-0.5 rounded text-[10px] inline-block">Try Standard mode</div>
+                  </div>
+                </td>
+                <td class="p-3">
+                  <span class="text-[11px] text-flowly-textMuted font-medium block">Docling local OCR/layout</span>
+                  <span class="text-[10px] font-mono font-bold text-spruce-700 bg-spruce-50 border border-spruce-100 px-1.5 py-0.5 rounded mt-1 inline-block">light</span>
+                </td>
+                <td class="p-3 text-right">
+                  <button onclick="triggerToast('Retrying with Standard mode...')" class="px-3 py-1.5 bg-white hover:bg-spruce-50 text-flowly-textMuted hover:text-spruce-700 border border-flowly-border hover:border-spruce-200 text-[11px] font-semibold rounded-lg transition-all">Retry</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Footer status -->
+      <div class="bg-white border-t border-flowly-border px-6 py-3 flex items-center justify-between text-[11px] text-flowly-textMuted flex-shrink-0">
+        <div class="flex items-center gap-2 font-medium">
+          <span class="w-2 h-2 rounded-full bg-spruce-700 inline-block"></span>
+          <span>Engine: <strong class="text-flowly-textMain font-bold">Docling Local OCR/Layout</strong></span>
+        </div>
+        <span>Models folder: <strong class="text-flowly-textMain font-semibold">Desktop app data</strong></span>
+      </div>
+    </main>
+
+    <!-- RIGHT INSPECTOR PANEL -->
+    <aside class="w-80 bg-white border-l border-flowly-border flex flex-col flex-shrink-0 overflow-y-auto">
+      <div class="p-5 space-y-5">
+
+        <!-- Export fields -->
+        <div class="bg-white rounded-xl border border-flowly-border p-4 shadow-2xs">
+          <h2 class="text-xs font-bold uppercase tracking-widest text-flowly-textMuted mb-4">Export fields</h2>
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between p-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl transition-all">
+              <div>
+                <span class="text-xs font-bold text-flowly-textMain block">Vendor</span>
+                <span class="text-[10px] text-flowly-textMuted font-medium">CSV column: Vendor</span>
+              </div>
+              <span class="switch-track on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></span>
+            </div>
+            <div class="flex items-center justify-between p-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl transition-all">
+              <div>
+                <span class="text-xs font-bold text-flowly-textMain block">Invoice #</span>
+                <span class="text-[10px] text-flowly-textMuted font-medium">CSV column: Invoice Number</span>
+              </div>
+              <span class="switch-track on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></span>
+            </div>
+            <div class="flex items-center justify-between p-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl transition-all">
+              <div>
+                <span class="text-xs font-bold text-flowly-textMain block">Invoice Date</span>
+                <span class="text-[10px] text-flowly-textMuted font-medium">Optional date field</span>
+              </div>
+              <span class="switch-track on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></span>
+            </div>
+            <div class="flex items-center justify-between p-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl transition-all">
+              <div>
+                <span class="text-xs font-bold text-flowly-textMain block">Due Date</span>
+                <span class="text-[10px] text-flowly-textMuted font-medium">Optional date field</span>
+              </div>
+              <span class="switch-track on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></span>
+            </div>
+            <div class="flex items-center justify-between p-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl transition-all">
+              <div>
+                <span class="text-xs font-bold text-flowly-textMain block">Total</span>
+                <span class="text-[10px] text-flowly-textMuted font-medium">Required money field</span>
+              </div>
+              <span class="switch-track on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Machine check -->
+        <div class="bg-white rounded-xl border border-flowly-border p-4 shadow-2xs">
+          <h2 class="text-xs font-bold uppercase tracking-widest text-flowly-textMuted mb-4">Machine check</h2>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-flowly-textMuted font-medium">Recommended mode</span>
+              <span class="text-[10px] font-bold text-spruce-700 bg-spruce-50 border border-spruce-100 px-1.5 py-0.5 rounded">Light</span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-flowly-textMuted font-medium">CPU</span>
+              <span class="font-bold text-flowly-textMain">8 logical cores</span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-flowly-textMuted font-medium">Memory</span>
+              <span class="font-bold text-flowly-textMain">16 GB total</span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-flowly-textMuted font-medium">GPU</span>
+              <span class="font-bold text-flowly-textMuted">not required</span>
+            </div>
+            <div class="h-2 rounded-full bg-slate-200 overflow-hidden mt-1">
+              <div class="h-full w-[72%] rounded-full bg-gradient-to-r from-spruce-700 to-spruce-200"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model status -->
+        <div class="bg-white rounded-xl border border-flowly-border p-4 shadow-2xs">
+          <h2 class="text-xs font-bold uppercase tracking-widest text-flowly-textMuted mb-4">Model status</h2>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between p-2.5 bg-slate-50 border border-flowly-border rounded-xl">
+              <div class="flex items-center gap-2.5">
+                <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
+                <span class="text-xs font-semibold text-flowly-textMain">Light parser ready</span>
+              </div>
+              <span class="text-[9px] bg-spruce-50 text-spruce-800 font-bold px-1.5 py-0.5 rounded border border-spruce-100">Active</span>
+            </div>
+            <div class="flex items-center justify-between p-2.5 bg-slate-50 border border-flowly-border rounded-xl">
+              <div class="flex items-center gap-2.5">
+                <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
+                <span class="text-xs font-semibold text-flowly-textMain">Standard parser ready</span>
+              </div>
+              <span class="text-[9px] bg-slate-100 text-flowly-textMuted font-bold px-1.5 py-0.5 rounded border border-flowly-border">Standby</span>
+            </div>
+            <div class="text-[11px] text-flowly-textMuted font-medium mt-2 px-1">
+              Models folder: <strong class="text-flowly-textMain">Desktop app data folder</strong>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    function triggerToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-message');
+      toastMsg.innerText = message;
+      toast.classList.remove('opacity-0', 'translate-y-[-20px]', 'pointer-events-none');
+      setTimeout(() => { toast.classList.add('opacity-0', 'translate-y-[-20px]', 'pointer-events-none'); }, 3000);
+    }
+
+    function setMode(mode) {
+      document.querySelectorAll('.mode-btn').forEach(b => {
+        b.className = 'mode-btn flex-1 px-4 py-1.5 text-xs font-bold rounded-lg text-flowly-textMuted hover:text-spruce-700 transition-all';
+      });
+      document.getElementById('mode-' + mode).className = 'mode-btn flex-1 px-4 py-1.5 text-xs font-bold rounded-lg bg-spruce-700 text-white shadow-3xs transition-all';
+      triggerToast('Switched to ' + mode + ' extraction mode');
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const footer = document.getElementById('sidebar-footer');
+      const isExpanded = sidebar.classList.contains('w-64');
+      if (isExpanded) {
+        sidebar.classList.replace('w-64', 'w-20');
+        sidebar.classList.add('sidebar-collapsed');
+        footer.classList.replace('p-4', 'p-3');
+      } else {
+        sidebar.classList.replace('w-20', 'w-64');
+        sidebar.classList.remove('sidebar-collapsed');
+        footer.classList.replace('p-3', 'p-4');
+      }
+    }
+  </script>
+</body>
+</html>

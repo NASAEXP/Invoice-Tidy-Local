@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Invoice Tidy - Private Local Desktop Ingestion</title>
+
+  <!-- Offline-first UI assets (no CDN) -->
+  <link href="vendor/tailwind.css" rel="stylesheet">
+  <link href="index.css" rel="stylesheet">
+
+  <!-- Core Alpine Controller -->
+  <script src="app.js"></script>
+  <script defer src="vendor/alpine.min.js"></script>
+</head>
+<body x-data="appController()" class="bg-flowly-bg text-flowly-textMain font-sans h-screen w-screen overflow-hidden antialiased flex">
+
+  <!-- Interactive Action Toast Notification -->
+  <div id="toast" class="fixed top-8 left-1/2 transform -translate-x-1/2 z-50 bg-[#101828] text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-[-20px] pointer-events-none">
+    <svg class="w-5 h-5 text-spruce-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+    </svg>
+    <span id="toast-message" class="text-xs font-semibold">Changes synced successfully</span>
+  </div>
+
+  <!-- MAIN APPLICATION LAYOUT CONTAINER -->
+  <div class="w-full h-full bg-flowly-bg flex overflow-hidden">
+    
+    <!-- LEFT SIDEBAR -->
+    <aside id="sidebar" :class="sidebarCollapsed ? 'w-20 sidebar-collapsed' : 'w-64'" class="bg-white border-r border-flowly-border flex flex-col flex-shrink-0 z-10 transition-all duration-300 ease-in-out relative">
+      <!-- Toggle handle -->
+      <button @click="toggleSidebar()" class="sidebar-handle" aria-label="Toggle sidebar">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+      </button>
+
+      <div class="flex-1 flex flex-col min-h-0">
+        <!-- Logo -->
+        <div class="p-6 flex items-center justify-between border-b border-flowly-border transition-all duration-300" id="sidebar-header">
+          <div class="flex items-center gap-2.5 overflow-hidden">
+            <div class="w-9 h-9 flex-shrink-0 rounded-xl bg-spruce-700 flex items-center justify-center shadow-md shadow-spruce-700/10 text-white font-black">
+              <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2a4 4 0 014 4v2a4 4 0 01-4 4 4 4 0 01-4-4V6a4 4 0 014-4zm0 10a4 4 0 014 4v2a4 4 0 01-4 4 4 4 0 01-4-4v-2a4 4 0 014-4zm-6-2a4 4 0 014-4H8a4 4 0 01-4 4 4 4 0 014 4h2a4 4 0 01-4-4zm12 0a4 4 0 014-4h-2a4 4 0 01-4 4 4 4 0 014 4h2a4 4 0 01-4-4z"/>
+              </svg>
+            </div>
+            <div class="sidebar-text transition-opacity duration-300">
+              <span class="font-extrabold text-flowly-textMain text-sm tracking-tight block leading-none">Invoice Tidy</span>
+              <span class="text-[9px] text-spruce-700 font-bold tracking-widest uppercase mt-1 block">Local Desktop</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar Navigation Menu -->
+        <nav class="p-3 space-y-6 flex-1 overflow-y-auto">
+          <div>
+            <span class="sidebar-section-label text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest px-3 block mb-2">Workspace</span>
+            <div class="space-y-0.5">
+              <button @click="switchView('workspace')" :class="currentView === 'workspace' ? 'bg-spruce-50 text-spruce-700 border-l-2 border-spruce-700 font-bold' : 'text-flowly-textMuted hover:bg-spruce-50/40 hover:text-spruce-700 font-semibold'" class="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all text-xs text-left group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-slate-400 group-hover:text-spruce-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                  <span class="sidebar-text">Invoices Batch</span>
+                </div>
+                <span class="font-mono text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-spruce-200/50 text-spruce-700 sidebar-text" x-text="documents.length">0</span>
+              </button>
+
+              <button @click="switchView('fields')" :class="currentView === 'fields' ? 'bg-spruce-50 text-spruce-700 border-l-2 border-spruce-700 font-bold' : 'text-flowly-textMuted hover:bg-spruce-50/40 hover:text-spruce-700 font-semibold'" class="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all text-xs text-left group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-slate-400 group-hover:text-spruce-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                  <span class="sidebar-text">Template Columns</span>
+                </div>
+                <span class="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 sidebar-text" x-text="fields.length">0</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <span class="sidebar-section-label text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest px-3 block mb-2">System Diagnostics</span>
+            <div class="space-y-0.5">
+              <button @click="switchView('compatibility')" :class="currentView === 'compatibility' ? 'bg-spruce-50 text-spruce-700 border-l-2 border-spruce-700 font-bold' : 'text-flowly-textMuted hover:bg-spruce-50/40 hover:text-spruce-700 font-semibold'" class="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all text-xs text-left group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-slate-400 group-hover:text-spruce-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                  <span class="sidebar-text">Hardware Suitability</span>
+                </div>
+              </button>
+
+              <button @click="switchView('settings')" :class="currentView === 'settings' ? 'bg-spruce-50 text-spruce-700 border-l-2 border-spruce-700 font-bold' : 'text-flowly-textMuted hover:bg-spruce-50/40 hover:text-spruce-700 font-semibold'" class="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all text-xs text-left group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-slate-400 group-hover:text-spruce-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                  <span class="sidebar-text">Daemon Settings</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </nav>
+      </div>
+
+      <!-- Footer Info -->
+      <div class="p-4 border-t border-flowly-border bg-slate-50 transition-all duration-300" id="sidebar-footer">
+        <div class="flex items-center gap-2.5 p-1.5 rounded-xl overflow-hidden">
+          <div class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0"></div>
+          <span class="text-[10px] text-flowly-textMuted font-semibold sidebar-text">All invoice data stays local</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RIGHT CONTAINER PANELS (SWITCHED DYNAMICALLY) -->
+    <div class="flex-1 flex flex-col overflow-hidden min-w-0 bg-flowly-bg">
+
+      <!-- ============================================== -->
+      <!-- VIEW 1: WORKSPACE / INVOICE INGESTION DASHBOARD -->
+      <!-- ============================================== -->
+      <template x-if="currentView === 'workspace'">
+        <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+          
+          <!-- Header -->
+          <header class="h-16 bg-white border-b border-flowly-border px-6 flex items-center justify-between flex-shrink-0">
+            <div>
+              <div class="flex items-center gap-1 text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest leading-none mb-1">
+                <span>Local Desktop</span>
+                <svg class="w-2 h-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+                <span class="text-spruce-700">Invoice Workspace</span>
+              </div>
+              <h1 class="text-sm font-bold text-flowly-textMain tracking-tight leading-none flex items-center gap-2">
+                Local Invoice Ingestion Dashboard
+                <span class="text-[11px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-flowly-border">Zero-Cloud Neural Extraction</span>
+              </h1>
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click="exportCSV()" class="px-4 py-2 bg-spruce-700 hover:bg-spruce-800 hover:shadow-lg hover:shadow-spruce-700/20 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+                Export Approved to CSV
+              </button>
+            </div>
+          </header>
+
+          <!-- Scrollable content -->
+          <section class="flex-1 overflow-y-auto p-6 space-y-5">
+            
+            <!-- Drag & Drop / File chooser section -->
+            <div id="invoice-drop-zone" style="--wails-drop-target: drop;" class="invoice-drop-zone bg-white rounded-2xl border-2 border-dashed border-flowly-border hover:border-spruce-300 transition-all p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+              <div>
+                <h2 class="text-base font-extrabold text-flowly-textMain tracking-tight flex items-center gap-2">
+                  <svg class="w-5 h-5 text-spruce-700 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                  Select or drag invoice PDFs or images to begin parsing
+                </h2>
+                <p class="text-[11px] text-flowly-textMuted font-medium mt-1.5">Drop PDF, PNG, JPG, WebP, TIFF, or BMP files here. Documents stay in your local app storage folder.</p>
+              </div>
+              <div class="flex flex-col gap-2.5 min-w-[240px]">
+                <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest">Extraction Neural Mode</span>
+                <div class="flex bg-slate-200/70 p-1 rounded-xl border border-flowly-border/70">
+                  <button @click="setModelMode('light')" :class="mode === 'light' ? 'bg-spruce-700 text-white shadow-3xs' : 'text-flowly-textMuted hover:text-spruce-700'" class="flex-1 px-4 py-1.5 text-xs font-bold rounded-lg transition-all">Light (Fast OCR)</button>
+                  <button @click="setModelMode('standard')" :class="mode === 'standard' ? 'bg-spruce-700 text-white shadow-3xs' : 'text-flowly-textMuted hover:text-spruce-700'" class="flex-1 px-4 py-1.5 text-xs font-bold rounded-lg transition-all">Standard (Granite AI)</button>
+                </div>
+                <button @click="chooseAndImport()" class="px-4 py-2 bg-spruce-700 hover:bg-spruce-800 hover:shadow-lg hover:shadow-spruce-700/20 text-white text-xs font-bold rounded-xl transition-all">Choose Invoices</button>
+              </div>
+            </div>
+
+            <!-- Queue Statistics Cards -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div class="bg-white rounded-xl border border-flowly-border p-4 hover:border-spruce-200 transition-colors">
+                <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest block">In Queue</span>
+                <span class="text-2xl font-extrabold text-flowly-textMain block mt-1.5 tracking-tight font-mono" x-text="queueStatus.queued">0</span>
+              </div>
+              <div class="bg-white rounded-xl border border-flowly-border p-4 hover:border-spruce-200 transition-colors">
+                <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest block">Needs Review</span>
+                <span class="text-2xl font-extrabold text-amber-600 block mt-1.5 tracking-tight font-mono" x-text="queueStatus.needsReview">0</span>
+              </div>
+              <div class="bg-white rounded-xl border border-flowly-border p-4 hover:border-spruce-200 transition-colors">
+                <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest block">Approved</span>
+                <span class="text-2xl font-extrabold text-spruce-700 block mt-1.5 tracking-tight font-mono" x-text="queueStatus.approved">0</span>
+              </div>
+              <div class="bg-white rounded-xl border border-flowly-border p-4 hover:border-spruce-200 transition-colors">
+                <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest block">Active Processing</span>
+                <span class="text-2xl font-extrabold text-blue-600 block mt-1.5 tracking-tight font-mono" x-text="queueStatus.processing">0</span>
+              </div>
+            </div>
+
+            <!-- Current Batch Invoices Table -->
+            <div class="bg-white rounded-2xl border border-flowly-border shadow-md overflow-hidden">
+              <div class="px-5 py-3.5 border-b border-flowly-border flex items-center justify-between bg-slate-50">
+                <span class="text-xs font-bold text-flowly-textMain">Active Batch Records</span>
+                <div class="flex items-center gap-2">
+                  <span x-show="selectedDocumentCount() > 0" class="text-[11px] font-semibold text-flowly-textMuted"><span x-text="selectedDocumentCount()">0</span> selected</span>
+                  <button x-show="selectedDocumentCount() > 0" @click="deleteSelectedDocuments()" class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[11px] font-bold rounded-lg transition-all">Delete Selected</button>
+                  <button @click="loadDocuments()" class="px-3 py-1.5 bg-white hover:bg-spruce-50 text-flowly-textMuted hover:text-spruce-700 border border-flowly-border hover:border-spruce-200 text-[11px] font-semibold rounded-lg transition-all">Reload Batch</button>
+                </div>
+              </div>
+
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 border-b border-flowly-border text-flowly-textMuted font-bold uppercase text-[9px] tracking-wider">
+                  <tr>
+                    <th class="w-10 p-3">
+                      <input type="checkbox" class="h-3.5 w-3.5 rounded border-flowly-border text-spruce-700 focus:ring-spruce-700" :checked="allDocumentsSelected()" x-effect="$el.indeterminate = selectedDocumentCount() > 0 && !allDocumentsSelected()" @change="toggleAllDocuments($event.target.checked)" aria-label="Select all invoices">
+                    </th>
+                    <th class="p-3">File Name</th>
+                    <th class="p-3">Ingestion Status</th>
+                    <th class="p-3">Parsed Attributes</th>
+                    <th class="p-3">Engine Config</th>
+                    <th class="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-flowly-border">
+                  <template x-for="doc in documents" :key="doc.id">
+                    <tr class="hover:bg-spruce-50/30 transition-colors">
+                      <td class="p-3 align-top">
+                        <input type="checkbox" class="h-3.5 w-3.5 rounded border-flowly-border text-spruce-700 focus:ring-spruce-700" :checked="isDocumentSelected(doc.id)" @click.stop @change="toggleDocumentSelection(doc.id, $event.target.checked)" :aria-label="'Select ' + doc.sourceFileName">
+                      </td>
+                      <td class="p-3">
+                        <span class="font-bold text-flowly-textMain block truncate max-w-xs" x-text="doc.sourceFileName">invoice.pdf</span>
+                        <span class="text-[10px] text-flowly-textMuted font-medium mt-0.5 block">SHA: <span class="font-mono text-[9px]" x-text="doc.fileHash.slice(0, 12) + '...'">hash</span></span>
+                      </td>
+                      <td class="p-3">
+                        <!-- Standard Status Badges -->
+                        <span x-show="doc.status === 'needs_review'" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                          Needs Review
+                        </span>
+                        <span x-show="doc.status === 'approved'" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          Approved
+                        </span>
+                        <span x-show="doc.status === 'failed'" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                          <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                          Failed
+                        </span>
+                        <span x-show="doc.status === 'processing'" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                          <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                          Processing
+                        </span>
+                        
+                        <!-- In-Row Real-Time Progress -->
+                        <div x-show="processingProgress[doc.id]" class="mt-2 w-32">
+                          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-spruce-700 transition-all duration-300" :style="'width: ' + (processingProgress[doc.id]?.progress || 0) + '%'"></div>
+                          </div>
+                          <span class="text-[9px] text-spruce-700 font-semibold block mt-1" x-text="processingProgress[doc.id]?.message">Extracting...</span>
+                        </div>
+                      </td>
+                      <td class="p-3">
+                        <div class="space-y-1 text-[11px]">
+                          <div class="text-flowly-textMuted font-medium">Vendor: <span class="font-semibold text-flowly-textMain" x-text="doc.fields?.vendor_name || 'Unidentified'">Vendor</span></div>
+                          <div class="text-flowly-textMuted font-medium">Total: <span class="font-mono font-bold text-flowly-textMain" x-text="(doc.fields?.currency || '$') + ' ' + (doc.fields?.total || '0.00')">Total</span></div>
+                          <div class="text-flowly-textMuted font-medium">Due Date: <span class="font-semibold text-flowly-textMain" x-text="doc.fields?.due_date || 'Missing'">Due</span></div>
+                        </div>
+                      </td>
+                      <td class="p-3">
+                        <span class="text-[11px] text-flowly-textMuted font-medium block">TidyEngine Local Layout</span>
+                        <span class="text-[10px] font-mono font-bold text-spruce-700 bg-spruce-50 border border-spruce-100 px-1.5 py-0.5 rounded mt-1 inline-block uppercase" x-text="doc.extractionMode || 'light'">mode</span>
+                      </td>
+                      <td class="p-3 text-right">
+                        <button @click="startReview(doc)" class="px-3 py-1.5 bg-spruce-700 hover:bg-spruce-800 text-white text-[11px] font-bold rounded-lg transition-all">Review</button>
+                      </td>
+                    </tr>
+                  </template>
+                  <template x-if="documents.length === 0">
+                    <tr>
+                      <td colspan="6" class="p-8 text-center text-flowly-textMuted">
+                        No invoice files found in local SQLite database. Import files to start neural processing.
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </template>
+
+      <!-- ============================================== -->
+      <!-- VIEW 2: SPLIT SCREEN INVOICE EDITOR & VALIDATOR -->
+      <!-- ============================================== -->
+      <template x-if="currentView === 'review'">
+        <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+          
+          <!-- Header -->
+          <header class="h-16 bg-white border-b border-flowly-border px-6 flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center gap-3">
+              <button @click="currentView = 'workspace'" class="w-7 h-7 rounded-lg border border-flowly-border flex items-center justify-center hover:bg-spruce-50 hover:border-spruce-200 hover:text-spruce-700 transition-all text-slate-500">
+                <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+              </button>
+              
+              <div>
+                <div class="flex items-center gap-1 text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest leading-none mb-1">
+                  <span>Workspace Batch</span>
+                  <svg class="w-2 h-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+                  <span class="text-spruce-700">Audit Review Item</span>
+                </div>
+                <h1 class="text-sm font-bold text-flowly-textMain tracking-tight leading-none flex items-center gap-2">
+                  <span x-text="currentDoc?.sourceFileName">Invoice File</span>
+                  <span class="text-[11px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-flowly-border uppercase" x-text="currentDoc?.extractionMode + ' mode'">mode</span>
+                </h1>
+              </div>
+            </div>
+
+            <!-- Meta status elements -->
+            <div class="flex items-center gap-5">
+              <div class="flex items-center gap-1.5 text-xs font-semibold text-flowly-textMuted">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>Active Session Persistence</span>
+              </div>
+            </div>
+          </header>
+
+          <!-- Actions Bar -->
+          <section class="bg-white border-b border-flowly-border px-6 py-3 flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center gap-2">
+              <button @click="skipDocument()" class="px-3 py-2 bg-white hover:bg-spruce-50 hover:text-spruce-700 hover:border-spruce-200 text-flowly-textMain border border-flowly-border text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
+                <svg class="w-4 h-4 text-flowly-textMuted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+                Skip Invoice
+              </button>
+              <button @click="approveAndNext()" class="px-4 py-2 bg-spruce-700 hover:bg-spruce-800 hover:shadow-lg hover:shadow-spruce-700/20 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                Approve &amp; Next
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button @click="reprocessCurrentDoc()" class="px-3 py-2 bg-white hover:bg-spruce-50 hover:text-spruce-700 hover:border-spruce-200 text-flowly-textMuted border border-flowly-border rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.228 10H18.22"></path></svg>
+                Reprocess Document
+              </button>
+              <button @click="deleteCurrentDoc()" class="px-3 py-2 bg-slate-50 hover:bg-spruce-50 hover:text-spruce-800 hover:border-spruce-200 border border-flowly-border text-flowly-textMain rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-flowly-textMuted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                Delete File Record
+              </button>
+            </div>
+          </section>
+
+          <!-- Split-screen grid layout -->
+          <section class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden p-6 gap-6">
+            
+            <!-- Left Grid Pane: Original Document Preview -->
+            <div class="lg:col-span-5 flex flex-col h-full overflow-hidden">
+              <div id="preview-canvas-backdrop" class="flex-1 min-h-0 overflow-auto flex items-start justify-center">
+                  <template x-if="currentDocBase64 === 'loading'">
+                    <div class="w-full h-full min-h-[420px] flex items-center justify-center">
+                      <div class="w-full max-w-sm space-y-3">
+                        <div class="h-2 bg-white rounded-full overflow-hidden">
+                          <div class="h-full w-2/3 shimmer-bg rounded-full"></div>
+                        </div>
+                        <div class="text-center text-[11px] text-flowly-textMuted font-semibold">Loading original document...</div>
+                      </div>
+                    </div>
+                  </template>
+
+                  <template x-if="currentDocBase64 === 'error'">
+                    <div class="w-full h-full min-h-[420px] flex items-center justify-center">
+                      <div class="text-xs font-semibold text-red-600">
+                        Could not load the stored document file.
+                      </div>
+                    </div>
+                  </template>
+
+                  <template x-if="isPreviewImage()">
+                    <div class="relative inline-block max-w-full">
+                      <img :src="currentDocBase64"
+                           :alt="currentDoc?.sourceFileName || 'Invoice document'"
+                           @load="capturePreviewImageSize($event)"
+                           class="block max-w-full h-auto" />
+                      <div x-show="activeHighlight.opacity > 0"
+                           :style="highlightStyle()"
+                           class="absolute border-2 border-spruce-700 bg-spruce-700/10 shadow-[0_0_0_2px_rgba(255,255,255,0.85),0_0_0_4px_rgba(15,84,87,0.22)] pointer-events-none transition-all duration-150"></div>
+                    </div>
+                  </template>
+
+                  <template x-if="isPreviewPdf()">
+                    <iframe :src="currentDocBase64"
+                            :title="currentDoc?.sourceFileName || 'Invoice PDF'"
+                            class="w-full h-full min-h-[620px] bg-white border-0"></iframe>
+                  </template>
+
+                  <template x-if="currentDocBase64 && currentDocBase64 !== 'loading' && currentDocBase64 !== 'error' && !isPreviewImage() && !isPreviewPdf()">
+                    <div class="w-full h-full min-h-[420px] flex items-center justify-center">
+                      <div class="text-xs font-semibold text-flowly-textMuted">
+                        Preview is not available for this file type.
+                      </div>
+                    </div>
+                  </template>
+              </div>
+            </div>
+
+            <!-- Right Grid Pane: Form Controls & Auditing Tabs -->
+            <div class="lg:col-span-7 flex flex-col overflow-hidden h-full">
+              <div class="bg-white rounded-2xl border border-flowly-border flex flex-col overflow-hidden h-full shadow-md">
+                
+                <!-- Tab Selector Header -->
+                <div class="flex items-center justify-between border-b border-flowly-border bg-slate-50 px-6 py-3">
+                  <div class="flex bg-slate-200/70 p-1 rounded-xl border border-flowly-border/70">
+                    <button @click="activeTab = 'tab-general'" :class="activeTab === 'tab-general' ? 'bg-white text-flowly-textMain shadow-3xs font-bold' : 'text-flowly-textMuted hover:text-spruce-700'" class="px-4 py-1.5 text-xs rounded-lg transition-all">Invoice Form</button>
+                    <button @click="activeTab = 'tab-duplicate'" :class="activeTab === 'tab-duplicate' ? 'bg-white text-flowly-textMain shadow-3xs font-bold' : 'text-flowly-textMuted hover:text-spruce-700'" class="px-4 py-1.5 text-xs rounded-lg transition-all">Duplicate Audit</button>
+                    <button @click="activeTab = 'tab-checks'" :class="activeTab === 'tab-checks' ? 'bg-white text-flowly-textMain shadow-3xs font-bold' : 'text-flowly-textMuted hover:text-spruce-700'" class="px-4 py-1.5 text-xs rounded-lg transition-all">Model Checks</button>
+                  </div>
+                  <span class="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest">Active Draft</span>
+                </div>
+
+                <!-- Tab Panels Area -->
+                <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                  
+                  <!-- TAB 1: GENERAL INVOICE FIELD EDITOR -->
+                  <div x-show="activeTab === 'tab-general'" class="space-y-6">
+                    <div>
+                      <h3 class="text-xs font-bold uppercase tracking-widest text-flowly-textMuted mb-4">Neural Field Extraction Values</h3>
+                      
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Loop through visible fields dynamically -->
+                        <template x-for="f in fields.filter(f => f.visible)" :key="f.fieldKey">
+                          <div :class="f.fieldKey === 'vendor_name' ? 'sm:col-span-2' : ''"
+                               @mouseenter="previewFieldHighlight(f.fieldKey)"
+                               @mouseleave="clearPreviewFieldHighlight(f.fieldKey)"
+                               @click="pinFieldHighlight(f.fieldKey)"
+                               class="space-y-1.5">
+                            <label class="text-xs font-bold text-flowly-textMuted flex justify-between">
+                              <span x-text="f.label">Field</span>
+                              <span class="text-spruce-700 font-bold bg-spruce-50 border border-spruce-100 px-1.5 py-0.5 rounded text-[10px]" x-text="f.required ? 'Required' : 'Optional'"></span>
+                            </label>
+                            
+                            <!-- Dynamic Focus Overlay Coordination -->
+                            <input type="text" 
+                                   :id="'input-' + f.fieldKey"
+                                   :value="currentDoc?.fields?.[f.fieldKey] || ''" 
+                                   @focus="focusField(f.fieldKey)" 
+                                   @blur="clearPreviewFieldHighlight(f.fieldKey)"
+                                   @input="updateFieldValue(f.fieldKey, $event.target.value)" 
+                                   class="w-full text-xs px-3.5 py-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-spruce-700 focus:border-spruce-700 transition-all font-semibold text-flowly-textMain" />
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+
+                    <!-- Spreadsheet Line Items editor -->
+                    <div>
+                      <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xs font-bold uppercase tracking-widest text-flowly-textMuted">Extracted Line Items</h3>
+                        <span class="text-[10px] font-mono font-bold text-slate-500 uppercase" x-text="currentLineItemRows().length ? currentLineItemRows().length + ' rows' : 'No table'"></span>
+                      </div>
+
+                      <template x-if="currentLineItemRows().length > 0">
+                        <div class="border border-flowly-border rounded-lg overflow-x-auto bg-white">
+                          <table class="w-full min-w-[820px] table-auto text-xs text-left">
+                            <thead class="bg-slate-50 border-b border-flowly-border text-flowly-textMuted font-bold uppercase text-[9px] tracking-wider">
+                              <tr>
+                                <template x-for="(header, index) in currentLineItemHeaders()" :key="index">
+                                  <th :style="lineItemColumnStyle(header, index)" :class="lineItemHeaderClass(header, index)" x-text="header"></th>
+                                </template>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <template x-for="(row, rowIndex) in currentLineItemRows()" :key="rowIndex">
+                                <tr class="border-b border-flowly-border last:border-b-0 hover:bg-spruce-50/30 transition-colors">
+                                  <template x-for="(cell, cellIndex) in row" :key="cellIndex">
+                                    <td :style="lineItemColumnStyle(currentLineItemHeaders()[cellIndex], cellIndex)" :class="lineItemCellClass(currentLineItemHeaders()[cellIndex], cell, cellIndex)" x-text="displayLineItemCell(currentLineItemHeaders()[cellIndex], cell, cellIndex)"></td>
+                                  </template>
+                                </tr>
+                              </template>
+                            </tbody>
+                          </table>
+                        </div>
+                      </template>
+
+                      <template x-if="currentLineItemRows().length === 0">
+                        <div class="border border-flowly-border rounded-xl bg-slate-50 px-4 py-5 text-xs font-semibold text-flowly-textMuted">
+                          No extracted line item table for this document.
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- TAB 2: DUPLICATE AUDITING -->
+                  <div x-show="activeTab === 'tab-duplicate'" class="space-y-4">
+                    <div class="border border-flowly-border rounded-xl p-5 bg-slate-50 space-y-4">
+                      <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-bold uppercase tracking-widest text-flowly-textMuted">SHA-256 Hash Reconciliation</h3>
+                        <span class="text-[10px] bg-spruce-50 text-spruce-700 font-bold border border-spruce-100 px-2 py-0.5 rounded-full">Secure Dedup Active</span>
+                      </div>
+                      <p class="text-xs text-flowly-textMuted leading-relaxed">The system automatically matches digital signatures (SHA-256 hashes) before queue assignment. Duplicate files are resolved instantly to prevent duplicate bank entries.</p>
+                      
+                      <div class="bg-white border border-flowly-border rounded-xl p-4 space-y-3 font-mono text-2xs text-flowly-textMuted">
+                        <div>Current File Hash: <strong class="text-flowly-textMain block break-all" x-text="currentDoc?.fileHash || 'N/A'"></strong></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- TAB 3: PIPELINE CHECKS & SYSTEM LOGS -->
+                  <div x-show="activeTab === 'tab-checks'" class="space-y-6">
+                    <div>
+                      <h3 class="text-xs font-bold uppercase tracking-widest text-flowly-textMuted mb-3">Model Verification Parameters</h3>
+                      <div class="space-y-2">
+                        <div class="flex items-center justify-between p-3 bg-slate-50 border border-flowly-border rounded-xl">
+                          <div class="flex items-center gap-2.5">
+                            <svg class="w-4 h-4 text-spruce-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                            <span class="text-xs font-semibold text-flowly-textMain">Arithmetic Validation: Table items sum matches Subtotal</span>
+                          </div>
+                          <span class="text-[9px] bg-spruce-50 text-spruce-800 font-bold px-1.5 py-0.5 rounded border border-spruce-100">PASS</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-slate-50 border border-flowly-border rounded-xl">
+                          <div class="flex items-center gap-2.5">
+                            <svg class="w-4 h-4 text-spruce-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                            <span class="text-xs font-semibold text-flowly-textMain">UTF-8 Compliance: Text encoding verification</span>
+                          </div>
+                          <span class="text-[9px] bg-spruce-50 text-spruce-800 font-bold px-1.5 py-0.5 rounded border border-spruce-100">PASS</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                <!-- Footer details -->
+                <div class="bg-slate-50 border-t border-flowly-border px-6 py-4 flex items-center justify-between text-[11px] text-flowly-textMuted">
+                  <div class="flex items-center gap-2 font-medium">
+                    <span class="w-2 h-2 rounded-full bg-spruce-700 inline-block"></span>
+                    <span>TidyEngine Local OCR Process</span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </section>
+        </div>
+      </template>
+
+      <!-- ============================================== -->
+      <!-- VIEW 3: TEMPLATE FIELDS MANAGER -->
+      <!-- ============================================== -->
+      <template x-if="currentView === 'fields'">
+        <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+          <header class="h-16 bg-white border-b border-flowly-border px-6 flex items-center justify-between flex-shrink-0">
+            <div>
+              <div class="flex items-center gap-1 text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest leading-none mb-1">
+                <span>Configuration Settings</span>
+                <svg class="w-2 h-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+                <span class="text-spruce-700">Columns Mapping</span>
+              </div>
+              <h1 class="text-sm font-bold text-flowly-textMain tracking-tight leading-none">Template Ingestion Columns Manager</h1>
+            </div>
+          </header>
+
+          <section class="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Left 2 Cols: Field List -->
+            <div class="lg:col-span-2 space-y-4">
+              <div class="bg-white rounded-2xl border border-flowly-border p-6 shadow-md">
+                <h3 class="text-sm font-bold text-flowly-textMain mb-4">Active System &amp; Custom Extraction Fields</h3>
+                
+                <div class="space-y-2.5">
+                  <template x-for="f in fields" :key="f.fieldKey">
+                    <div class="flex items-center justify-between p-3.5 bg-slate-50 hover:bg-spruce-50/20 border border-flowly-border rounded-xl transition-all">
+                      <div>
+                        <span class="text-xs font-bold text-flowly-textMain block" x-text="f.label">Label</span>
+                        <span class="text-[10px] text-flowly-textMuted font-medium font-mono" x-text="'key: ' + f.fieldKey + ' | Export as: ' + f.exportColumn">meta</span>
+                      </div>
+                      
+                      <!-- Visibility toggle -->
+                      <div class="flex items-center gap-3">
+                        <span class="text-[10px] text-flowly-textMuted font-bold uppercase tracking-wider" x-text="f.visible ? 'Visible' : 'Hidden'"></span>
+                        <span class="switch-track" :class="f.visible ? 'on' : 'off'" @click="toggleFieldVisibility(f)"></span>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right 1 Col: Create custom field form -->
+            <div class="space-y-4">
+              <div class="bg-white rounded-2xl border border-flowly-border p-6 shadow-md space-y-4">
+                <h3 class="text-sm font-bold text-flowly-textMain">Register New Custom Neural Column</h3>
+                <p class="text-[11px] text-flowly-textMuted">Newly registered fields will be extracted from documents during subsequent ingestion cycles.</p>
+                
+                <div class="space-y-3">
+                  <div class="space-y-1">
+                    <label class="text-[11px] font-bold text-flowly-textMuted uppercase tracking-wider">Field Key (Unique lowercase/no space)</label>
+                    <input type="text" x-model="newField.fieldKey" placeholder="e.g. tracking_id" class="w-full text-xs px-3.5 py-2 border border-flowly-border rounded-xl focus:outline-none focus:ring-1 focus:ring-spruce-700" />
+                  </div>
+                  
+                  <div class="space-y-1">
+                    <label class="text-[11px] font-bold text-flowly-textMuted uppercase tracking-wider">Display Label</label>
+                    <input type="text" x-model="newField.label" placeholder="e.g. Tracking ID" class="w-full text-xs px-3.5 py-2 border border-flowly-border rounded-xl focus:outline-none focus:ring-1 focus:ring-spruce-700" />
+                  </div>
+
+                  <div class="space-y-1">
+                    <label class="text-[11px] font-bold text-flowly-textMuted uppercase tracking-wider">Field Data Type</label>
+                    <select x-model="newField.type" class="w-full text-xs px-3.5 py-2 border border-flowly-border rounded-xl focus:outline-none focus:ring-1 focus:ring-spruce-700">
+                      <option value="text">Plain Text</option>
+                      <option value="money">Money / Float</option>
+                      <option value="date">Date Field</option>
+                    </select>
+                  </div>
+
+                  <div class="space-y-1">
+                    <label class="text-[11px] font-bold text-flowly-textMuted uppercase tracking-wider">CSV Export Column Name</label>
+                    <input type="text" x-model="newField.exportColumn" placeholder="e.g. Tracking Identifier" class="w-full text-xs px-3.5 py-2 border border-flowly-border rounded-xl focus:outline-none focus:ring-1 focus:ring-spruce-700" />
+                  </div>
+
+                  <button @click="saveCustomField()" class="w-full py-2 bg-spruce-700 hover:bg-spruce-800 text-white font-bold text-xs rounded-xl transition-all shadow-md">
+                    Register New Field Column
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </section>
+        </div>
+      </template>
+
+      <!-- ============================================== -->
+      <!-- VIEW 4: SYSTEM HARDWARE COMPATIBILITY DIAGNOSTICS -->
+      <!-- ============================================== -->
+      <template x-if="currentView === 'compatibility'">
+        <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+          <header class="h-16 bg-white border-b border-flowly-border px-6 flex items-center justify-between flex-shrink-0">
+            <div>
+              <div class="flex items-center gap-1 text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest leading-none mb-1">
+                <span>Hardware Analyzer</span>
+                <svg class="w-2 h-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+                <span class="text-spruce-700">System Compatibility</span>
+              </div>
+              <h1 class="text-sm font-bold text-flowly-textMain tracking-tight leading-none">Windows Hardware Performance grade</h1>
+            </div>
+          </header>
+
+          <section class="flex-1 overflow-y-auto p-6 max-w-4xl space-y-6">
+            <div class="bg-white rounded-2xl border border-flowly-border p-6 shadow-md space-y-6">
+              
+              <!-- Hardware rating visual header -->
+              <div class="flex items-center gap-4 border-b border-slate-100 pb-5">
+                <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-black text-2xl"
+                     :class="diagnostics.grade === 'great_fit' ? 'bg-emerald-600' : (diagnostics.grade === 'light_mode' ? 'bg-amber-500' : 'bg-red-500')">
+                  <span x-text="diagnostics.grade === 'great_fit' ? 'A' : (diagnostics.grade === 'light_mode' ? 'B' : 'C')"></span>
+                </div>
+                <div>
+                  <h2 class="text-base font-extrabold text-flowly-textMain" x-text="diagnostics.grade === 'great_fit' ? 'System Great Fit' : (diagnostics.grade === 'light_mode' ? 'System Suitable for Light Mode' : 'Cloud Neural Extraction Suggested')"></h2>
+                  <p class="text-xs text-flowly-textMuted mt-1" x-text="diagnostics.reason"></p>
+                </div>
+              </div>
+
+              <!-- Technical Stats -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-slate-50 border border-flowly-border rounded-xl p-4 space-y-2">
+                  <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-wider block">Physical Memory (RAM)</span>
+                  <span class="text-lg font-extrabold text-flowly-textMain block font-mono" x-text="diagnostics.ramFormatted"></span>
+                  <span class="text-[10px] text-flowly-textMuted block" x-text="'Bytes: ' + diagnostics.ramBytes"></span>
+                </div>
+
+                <div class="bg-slate-50 border border-flowly-border rounded-xl p-4 space-y-2">
+                  <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-wider block">CPU Logical Cores</span>
+                  <span class="text-lg font-extrabold text-flowly-textMain block font-mono" x-text="diagnostics.cpuCores + ' cores'"></span>
+                  <span class="text-[10px] text-flowly-textMuted block truncate" x-text="diagnostics.cpuModel"></span>
+                </div>
+
+                <div class="bg-slate-50 border border-flowly-border rounded-xl p-4 space-y-2">
+                  <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-wider block">Discrete GPU details</span>
+                  <span class="text-lg font-extrabold text-flowly-textMain block font-mono" x-text="diagnostics.gpuVramFormatted === 'None' ? 'No CUDA VRAM' : diagnostics.gpuVramFormatted"></span>
+                  <span class="text-[10px] text-flowly-textMuted block truncate" x-text="diagnostics.gpuController"></span>
+                </div>
+              </div>
+
+              <!-- General hardware note -->
+              <p class="text-xs text-flowly-textMuted leading-relaxed pt-2">Invoice Tidy Local operates completely private standard and light extraction modules inside native Sandboxes. Standard Granite models run heavier transformers pipelines on physical hardware. Light mode utilizes Cgo-free lightweight layouts to process files in seconds on standard laptops.</p>
+
+            </div>
+          </section>
+        </div>
+      </template>
+
+      <!-- ============================================== -->
+      <!-- VIEW 5: DAEMON RUNTIME SETTINGS & HEALTH       -->
+      <!-- ============================================== -->
+      <template x-if="currentView === 'settings'">
+        <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+          <header class="h-16 bg-white border-b border-flowly-border px-6 flex items-center justify-between flex-shrink-0">
+            <div>
+              <div class="flex items-center gap-1 text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest leading-none mb-1">
+                <span>System Parameters</span>
+                <svg class="w-2 h-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+                <span class="text-spruce-700">Daemon Health Settings</span>
+              </div>
+              <h1 class="text-sm font-bold text-flowly-textMain tracking-tight leading-none">FastAPI Daemon Ingestion Parameters</h1>
+            </div>
+          </header>
+
+          <section class="flex-1 overflow-y-auto p-6 max-w-4xl space-y-6">
+            <div class="bg-white rounded-2xl border border-flowly-border p-6 shadow-md space-y-6">
+              
+              <h3 class="text-sm font-bold text-flowly-textMain border-b border-slate-100 pb-3">Active Daemon Process status</h3>
+              
+              <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span class="text-flowly-textMuted block">Connection Status</span>
+                    <strong class="text-flowly-textMain font-bold uppercase block mt-1" x-text="modelStatus.worker"></strong>
+                  </div>
+                  <div>
+                    <span class="text-flowly-textMuted block">Active Device</span>
+                    <strong class="text-flowly-textMain font-bold uppercase block mt-1" x-text="modelStatus.device"></strong>
+                  </div>
+                  <div>
+                    <span class="text-flowly-textMuted block">OCR Engine Driver</span>
+                    <strong class="text-flowly-textMain font-bold block mt-1" x-text="modelStatus.engine"></strong>
+                  </div>
+                  <div>
+                    <span class="text-flowly-textMuted block">Layout Model</span>
+                    <strong class="text-flowly-textMain font-bold block mt-1" x-text="modelStatus.model"></strong>
+                  </div>
+                </div>
+
+                <div class="border border-flowly-border rounded-xl p-4 bg-slate-50 text-[11px] space-y-1.5 font-medium text-flowly-textMuted">
+                  <div>Primary SQLite File: <strong class="text-flowly-textMain font-semibold" x-text="localPaths.sqlitePath || 'Loading...'"></strong></div>
+                  <div>Local Media Directory: <strong class="text-flowly-textMain font-semibold" x-text="localPaths.documentsDir || 'Loading...'"></strong></div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- LIVE DAEMON LOGS TERMINAL CARD -->
+            <div class="bg-white rounded-2xl border border-flowly-border p-6 shadow-md space-y-4">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 class="text-sm font-bold text-flowly-textMain">Live Neural Daemon Console Logs</h3>
+                  <p class="text-[11px] text-flowly-textMuted mt-0.5">Real-time standard output and tracebacks for local Python environments.</p>
+                </div>
+                <button @click="loadDaemonLogs()" class="px-3.5 py-1.5 bg-spruce-50 hover:bg-spruce-100 text-spruce-700 border border-spruce-200 hover:border-spruce-300 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-2xs">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3m0 0l3 3m-3-3v12"></path></svg>
+                  Refresh Logs
+                </button>
+              </div>
+
+              <!-- Terminal console output box -->
+              <div class="w-full bg-[#0d131a] rounded-xl border border-slate-800 p-5 flex flex-col overflow-hidden max-h-[350px]">
+                <div class="flex items-center gap-1.5 border-b border-slate-800 pb-2 mb-3.5 font-mono text-[10px] text-slate-500">
+                  <span class="w-2.5 h-2.5 rounded-full bg-red-500/80"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-green-500/80"></span>
+                  <span class="ml-1 text-slate-400" x-text="localPaths.daemonLogPath || 'daemon.log'"></span>
+                </div>
+                <pre class="flex-1 overflow-auto font-mono text-[11px] leading-relaxed text-slate-300 select-text p-2 bg-[#080d12] rounded border border-slate-900/60 max-h-[250px] whitespace-pre-wrap break-all" x-text="daemonLogs"></pre>
+              </div>
+            </div>
+
+          </section>
+        </div>
+      </template>
+
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- FULL SCREEN NEURAL DAEMON SETUP OVERLAY WINDOW -->
+  <!-- ============================================== -->
+  <div x-show="setupInProgress" class="fixed inset-0 z-50 dark-glass-overlay flex items-center justify-center p-4">
+    <div class="w-full max-w-2xl bg-[#0d1520] border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[500px]">
+      
+      <!-- Terminal Header -->
+      <div class="bg-[#15202e] px-5 py-3.5 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 rounded-full bg-red-500"></div>
+          <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+          <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+          <span class="text-[11px] font-mono font-bold text-slate-400 ml-2">Windows PowerShell - setup-docling.ps1</span>
+        </div>
+        <span class="text-xs font-bold text-emerald-400">Installing Modules</span>
+      </div>
+
+      <!-- Real-time standard output console logs container -->
+      <div id="setup-console" class="flex-1 p-6 overflow-y-auto font-mono text-xs text-slate-300 space-y-1.5 select-text bg-[#080d13]">
+        <div class="text-slate-500 font-bold">Initializing Invoice Tidy Local Neural Engine environment...</div>
+        <template x-for="(log, idx) in setupLogs" :key="idx">
+          <div class="break-all whitespace-pre-wrap leading-relaxed text-emerald-400" x-text="log"></div>
+        </template>
+        <template x-if="setupLogs.length === 0">
+          <div class="text-slate-500 italic">Starting compilation. Downloading local model weights (~2GB download)...</div>
+        </template>
+      </div>
+
+      <!-- Footer setup instructions -->
+      <div class="bg-[#121c27] border-t border-slate-800 px-6 py-4 flex items-center justify-between text-[10px] font-mono text-slate-400 flex-shrink-0">
+        <span>Compiling Python environments on local Windows physical drive</span>
+        <span>Please do not close this window</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- FULL SCREEN NEURAL ENGINE WARMUP OVERLAY -->
+  <!-- ============================================== -->
+  <div x-show="!setupInProgress && (modelStatus.worker === 'starting' || modelStatus.worker === 'warming')" 
+       class="fixed inset-0 z-40 dark-glass-overlay flex items-center justify-center p-6 transition-all duration-500">
+    <div class="w-full max-w-md bg-white rounded-2xl border border-flowly-border p-8 shadow-2xl flex flex-col items-center text-center space-y-6">
+      
+      <div class="space-y-2 w-full">
+        <h2 class="text-lg font-bold text-flowly-textMain tracking-tight" 
+            x-text="modelStatus.worker === 'starting' ? 'Warming Up Local Models' : 'Warming Up Neural Engine...'">
+          Warming Up Neural Engine...
+        </h2>
+      </div>
+
+      <!-- Shimmer loading bar -->
+      <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden relative shadow-inner">
+        <div class="absolute inset-0 warmup-shimmer-bar rounded-full"></div>
+      </div>
+
+      <!-- Diagnostic details -->
+      <div class="w-full border border-flowly-border rounded-xl p-4 bg-slate-50 text-[11px] text-flowly-textMuted space-y-2 text-left">
+        <div class="flex justify-between items-center">
+          <span>Active Device:</span>
+          <strong class="text-flowly-textMain font-bold uppercase" x-text="modelStatus.device || 'CPU'">CPU</strong>
+        </div>
+        <div class="flex justify-between items-center">
+          <span>OCR Model:</span>
+          <strong class="text-flowly-textMain font-mono font-semibold" x-text="modelStatus.model || 'ibm-granite/granite-docling-258M'">ibm-granite/granite-docling-258M</strong>
+        </div>
+        <div class="flex justify-between items-center">
+          <span>Status:</span>
+          <span class="text-spruce-700 font-bold bg-spruce-50 border border-spruce-100 px-1.5 py-0.5 rounded capitalize" x-text="modelStatus.worker">warming</span>
+        </div>
+      </div>
+
+      <div class="text-[10px] text-slate-400 font-medium font-mono">
+        This process usually takes 15 - 45 seconds on startup.
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>

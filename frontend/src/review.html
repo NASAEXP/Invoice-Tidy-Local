@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Invoice Tidy - Review Screen</title>
+  
+  <link href="vendor/tailwind.css" rel="stylesheet">
+  <link href="index.css" rel="stylesheet">
+  
+  <style>
+    /* Smooth transitions for high-fidelity coordinate-bound highlights */
+    #active-highlight {
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    /* Elegant modern scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.12);
+      border-radius: 99px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.22);
+    }
+
+    /* --- Sidebar collapsed state overrides --- */
+    #sidebar.sidebar-collapsed .sidebar-text {
+      opacity: 0;
+      width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      transition: opacity 0.2s ease, width 0.2s ease;
+      pointer-events: none;
+      position: absolute;
+    }
+
+    #sidebar:not(.sidebar-collapsed) .sidebar-text {
+      opacity: 1;
+      width: auto;
+      position: static;
+      transition: opacity 0.25s ease 0.1s;
+    }
+
+    /* Center nav link icons when collapsed */
+    #sidebar.sidebar-collapsed nav a,
+    #sidebar.sidebar-collapsed nav button {
+      justify-content: center;
+      padding-left: 0;
+      padding-right: 0;
+    }
+    #sidebar.sidebar-collapsed nav a > div,
+    #sidebar.sidebar-collapsed nav button {
+      justify-content: center;
+    }
+
+    /* Hide the workspace client card in collapsed mode */
+    #sidebar.sidebar-collapsed .sidebar-workspace {
+      display: none;
+    }
+
+    /* Hide section labels in collapsed mode */
+    #sidebar.sidebar-collapsed .sidebar-section-label {
+      display: none;
+    }
+
+    /* Center the logo in collapsed mode */
+    #sidebar.sidebar-collapsed #sidebar-header {
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    /* Center the footer avatar in collapsed mode */
+    #sidebar.sidebar-collapsed #sidebar-footer > div {
+      justify-content: center;
+    }
+
+    /* --- Sidebar door-handle toggle --- */
+    .sidebar-handle {
+      position: absolute;
+      top: 50%;
+      right: -14px;
+      transform: translateY(-50%);
+      z-index: 20;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: white;
+      border: 1px solid #D1D7DC;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.06);
+      transition: all 0.25s ease;
+      color: #5C6470;
+    }
+    .sidebar-handle:hover {
+      background: #f2f8f8;
+      border-color: #0c5c5e;
+      color: #094C4F;
+      box-shadow: 2px 0 12px rgba(9,76,79,0.12);
+      transform: translateY(-50%) scale(1.1);
+    }
+    .sidebar-handle svg {
+      width: 14px;
+      height: 14px;
+      transition: transform 0.3s ease;
+    }
+    #sidebar.sidebar-collapsed .sidebar-handle svg {
+      transform: rotate(180deg);
+    }
+  </style>
+</head>
+<body class="bg-flowly-bg text-flowly-textMain font-sans h-screen w-screen overflow-hidden antialiased flex flex-col justify-between">
+
+  <!-- Interactive Action Toast Notification -->
+  <div id="toast" class="fixed top-8 left-1/2 transform -translate-x-1/2 z-50 bg-[#101828] text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-[-20px] pointer-events-none">
+    <svg class="w-5 h-5 text-spruce-100 animate-spin hidden" id="toast-spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+    <svg class="w-5 h-5 text-spruce-100" id="toast-check" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+    <span id="toast-message" class="text-xs font-semibold">Changes synced successfully</span>
+  </div>
+
+  <!-- APPLICATION FULL-SCREEN CANVAS CONTAINER: Fluid edge-to-edge structural layout -->
+  <div class="w-full h-full bg-flowly-bg flex overflow-hidden">
+    
+    <!-- LEFT SIDEBAR: Crisp White Background with Pine Green branding -->
+    <aside id="sidebar" class="w-64 bg-white border-r border-flowly-border flex flex-col flex-shrink-0 z-10 transition-all duration-300 ease-in-out relative">
+      <!-- Door-handle toggle attached to sidebar edge -->
+      <button onclick="toggleSidebar()" class="sidebar-handle" aria-label="Toggle sidebar">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+      </button>
+      
+      <div class="flex-1 flex flex-col min-h-0">
+        <!-- Logo Header -->
+        <div class="p-6 flex items-center justify-between border-b border-flowly-border transition-all duration-300" id="sidebar-header">
+          <div class="flex items-center gap-2.5 overflow-hidden">
+            <div class="w-9 h-9 flex-shrink-0 rounded-xl bg-spruce-700 flex items-center justify-center shadow-md shadow-spruce-700/10 text-white font-black">
+              <!-- Grid Flower Pattern SVG matching the logo exactly -->
+              <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2a4 4 0 014 4v2a4 4 0 01-4 4 4 4 0 01-4-4V6a4 4 0 014-4zm0 10a4 4 0 014 4v2a4 4 0 01-4 4 4 4 0 01-4-4v-2a4 4 0 014-4zm-6-2a4 4 0 014-4H8a4 4 0 01-4 4 4 4 0 014 4h2a4 4 0 01-4-4zm12 0a4 4 0 014-4h-2a4 4 0 01-4 4 4 4 0 014 4h2a4 4 0 01-4-4z"/>
+              </svg>
+            </div>
+            <div class="sidebar-text transition-opacity duration-300">
+              <span class="font-extrabold text-flowly-textMain text-sm tracking-tight block leading-none">Invoice Tidy</span>
+              <span class="text-[9px] text-spruce-700 font-bold tracking-widest uppercase mt-1 block">TidyEngine AI</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flowly Workspace Segment - Clean border mapping with soft hover changes -->
+        <div class="sidebar-workspace px-4 py-4 border-b border-flowly-border bg-slate-50">
+          <div class="flex items-center gap-3 p-2 rounded-xl border border-flowly-border/70 bg-white hover:border-spruce-300 hover:bg-spruce-50/25 cursor-pointer transition-all overflow-hidden">
+            <div class="w-8 h-8 flex-shrink-0 rounded-lg bg-spruce-100 text-spruce-700 font-extrabold flex items-center justify-center text-xs shadow-2xs">
+              NB
+            </div>
+            <div class="text-left flex-1 min-w-0 sidebar-text transition-opacity duration-300">
+              <span class="text-[9px] text-flowly-textMuted uppercase font-bold tracking-wider block leading-none mb-1">Active Client</span>
+              <span class="text-xs font-bold text-slate-700 block truncate">Northstar Bookkeeping</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar Navigation Groups (General, Categories, Others) -->
+        <nav class="p-3 space-y-6 flex-1 overflow-y-auto">
+          <!-- General Section -->
+          <div>
+            <span class="sidebar-section-label text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest px-3 block mb-2">General</span>
+            <div class="space-y-0.5">
+              <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg text-flowly-textMuted hover:bg-spruce-50/40 hover:text-spruce-700 transition-all text-xs font-semibold group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-slate-400 group-hover:text-spruce-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                  <span class="sidebar-text">Dashboard</span>
+                </div>
+              </a>
+              <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg text-flowly-textMuted hover:bg-spruce-50/40 hover:text-spruce-700 transition-all text-xs font-semibold group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-slate-400 group-hover:text-spruce-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                  <span class="sidebar-text">Cash Flow</span>
+                </div>
+              </a>
+              <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg bg-spruce-50 text-spruce-700 hover:bg-spruce-100/50 font-bold text-xs transition-all border-l-2 border-spruce-700 shadow-2xs group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-spruce-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                  <span class="sidebar-text">Invoices</span>
+                </div>
+                <span id="badge-review" class="font-mono text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-spruce-200/50 text-spruce-700 sidebar-text">7</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Document Flow Section -->
+          <div>
+            <span class="sidebar-section-label text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest px-3 block mb-2">Queue Pipeline</span>
+            <div class="space-y-0.5">
+              <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg text-flowly-textMuted hover:bg-spruce-50/40 hover:text-spruce-700 transition-all text-xs font-semibold group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-slate-400 group-hover:text-spruce-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                  <span class="sidebar-text">Extract Queue</span>
+                </div>
+                <span id="badge-queue" class="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 group-hover:bg-spruce-100 group-hover:text-spruce-700 transition-colors sidebar-text">18</span>
+              </a>
+              <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg text-flowly-textMuted hover:bg-spruce-50/40 hover:text-spruce-700 transition-all text-xs font-semibold group">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <svg class="w-4 h-4 flex-shrink-0 text-slate-400 group-hover:text-spruce-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                  <span class="sidebar-text">Approved Logs</span>
+                </div>
+                <span class="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 group-hover:bg-spruce-100 group-hover:text-spruce-700 transition-colors sidebar-text">41</span>
+              </a>
+            </div>
+          </div>
+
+
+        </nav>
+      </div>
+
+      <!-- User Information bottom block -->
+      <div class="p-4 border-t border-flowly-border bg-slate-50 transition-all duration-300" id="sidebar-footer">
+        <div class="flex items-center gap-2.5 p-1.5 rounded-xl cursor-pointer hover:bg-spruce-50 hover:text-spruce-700 transition-colors group overflow-hidden">
+          <div class="relative flex-shrink-0">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Avatar" class="w-8 h-8 rounded-full object-cover ring-2 ring-slate-200" />
+            <span class="absolute bottom-0 right-0 block w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+          </div>
+          <div class="text-left min-w-0 sidebar-text transition-opacity duration-300">
+            <span class="text-xs font-bold text-flowly-textMain group-hover:text-spruce-700 block truncate transition-colors">Mario Angelo</span>
+            <span class="text-[9px] text-flowly-textMuted block">Finance Staff</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RIGHT MAIN PANELS -->
+    <main class="flex-1 flex flex-col overflow-hidden min-w-0 bg-flowly-bg">
+      
+      <!-- HEADER CONSOLE: Standard Breadcrumbs and Action bars -->
+      <header class="h-16 bg-white border-b border-flowly-border px-6 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <button class="w-7 h-7 rounded-lg border border-flowly-border flex items-center justify-center hover:bg-spruce-50 hover:border-spruce-200 hover:text-spruce-700 transition-all text-slate-500" onclick="triggerToast('Back to Invoice Directory')">
+            <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+          </button>
+          
+          <div>
+            <div class="flex items-center gap-1 text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest leading-none mb-1">
+              <span>Invoices</span>
+              <svg class="w-2 h-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+              <span class="text-spruce-700">Review Item</span>
+            </div>
+            <h1 id="topbar-vendor-title" class="text-sm font-bold text-flowly-textMain tracking-tight leading-none flex items-center gap-2">
+              Acme Office Supplies
+              <span id="topbar-inv-meta" class="text-[11px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-flowly-border">INV-1042 · $482.10</span>
+            </h1>
+          </div>
+        </div>
+
+        <!-- Meta status elements -->
+        <div class="flex items-center gap-5">
+          <!-- Saving tracker -->
+          <div class="flex items-center gap-1.5 text-xs font-semibold text-flowly-textMuted">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span id="save-state-text">Saved to Draft</span>
+          </div>
+
+          <!-- Queue Status Indicator -->
+          <div class="bg-white border border-flowly-border rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-2xs hover:border-spruce-300 transition-colors">
+            <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-wider">Review Queue</span>
+            <span id="queue-position-display" class="font-mono text-xs font-extrabold text-flowly-textMain">3 of 18</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- SUB HEADER ACTIONS BAR: Match Flowly Button styling and placement -->
+      <section class="bg-white border-b border-flowly-border px-6 py-3 flex items-center justify-between flex-shrink-0">
+        <!-- Main Actions -->
+        <div class="flex items-center gap-2">
+          <button class="px-3 py-2 bg-white hover:bg-spruce-50 hover:text-spruce-700 hover:border-spruce-200 text-flowly-textMain border border-flowly-border text-xs font-bold rounded-xl transition-all flex items-center gap-1.5" onclick="triggerToast('Skipping transaction...')">
+            <svg class="w-4 h-4 text-flowly-textMuted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+            Skip Detail
+          </button>
+          <button class="px-4 py-2 bg-spruce-700 hover:bg-spruce-800 hover:shadow-lg hover:shadow-spruce-700/20 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5" onclick="approveAndNext()">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+            Approve &amp; Next
+          </button>
+        </div>
+
+        <!-- Secondary options -->
+        <div class="flex items-center gap-2">
+          <button class="px-3 py-2 bg-white hover:bg-spruce-50 hover:text-spruce-700 hover:border-spruce-200 text-flowly-textMuted border border-flowly-border rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5" onclick="triggerToast('Executing OCR Layout Engine...')">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.228 10H18.22"></path></svg>
+            Retry Extraction
+          </button>
+          <button class="px-3 py-2 bg-white hover:bg-spruce-50 hover:text-spruce-700 hover:border-spruce-200 text-flowly-textMuted border border-flowly-border rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5" onclick="triggerToast('Opening original archive document...')">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+            Open Original
+          </button>
+          
+          <div class="h-4 w-px bg-flowly-border mx-1"></div>
+
+          <!-- Delete action - Styled in dark minimal state, spruce hover -->
+          <button class="px-3 py-2 bg-slate-50 hover:bg-spruce-50 hover:text-spruce-800 hover:border-spruce-200 border border-flowly-border text-flowly-textMain rounded-xl text-xs font-bold transition-all flex items-center gap-1.5" onclick="triggerToast('Removing invoice record...')">
+            <svg class="w-3.5 h-3.5 text-flowly-textMuted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            Delete
+          </button>
+        </div>
+      </section>
+
+      <!-- TWO CONTAINER LAYOUT: Swapped columns (Preview in middle, Forms on right) -->
+      <section class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden p-6 gap-6">
+        
+        <!-- MIDDLE WORKSPACE: High Fidelity Invoice PDF Renderer (Image aligned) - 5 of 12 Column block -->
+        <div class="lg:col-span-5 flex flex-col h-full overflow-hidden">
+          <!-- PREVIEW VIEWER SHEET CANVAS: Plain background for direct paper view -->
+          <div id="preview-canvas-backdrop" class="flex-1 overflow-y-auto flex justify-center items-start transition-all duration-200">
+            
+            <!-- FLOATING PAPER SHEET: Pure White sheet with enhanced deep drop-shadow -->
+            <article id="invoice-paper" class="w-full bg-white rounded-xl shadow-[0_20px_25px_-5px_rgba(0,0,0,0.15),0_10px_10px_-5px_rgba(0,0,0,0.1)] p-6 relative border border-slate-300 transition-all duration-350 text-flowly-textMain font-sans text-xs min-h-[560px]">
+                
+                <!-- DYNAMIC HIGHLIGHT OVERLAY FLUID BOUNDS (Styled in clean Spruce Teal) -->
+                <div id="active-highlight" class="absolute border-2 border-spruce-700 rounded-md pointer-events-none shadow-[0_0_0_4px_rgba(9,76,79,0.12)] bg-spruce-500/5 z-20">
+                  <div class="absolute -top-4 -left-1 bg-spruce-700 text-[8px] font-mono font-bold text-white px-1.5 py-0.5 rounded-sm shadow-xs uppercase leading-none tracking-wider">
+                    EXTRACTED FIELD
+                  </div>
+                </div>
+
+                <!-- Document Header Layout -->
+                <div class="flex justify-between items-start border-b border-slate-200 pb-4 mb-4">
+                  <div>
+                    <!-- Logo mark on printed document matching Flowly aesthetics -->
+                    <div class="flex items-center gap-1.5 mb-2">
+                      <div class="w-6 h-6 rounded-lg bg-spruce-700 flex items-center justify-center text-white font-bold">
+                        <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2a4 4 0 014 4v2a4 4 0 01-4 4 4 4 0 01-4-4V6a4 4 0 014-4zm0 10a4 4 0 014 4v2a4 4 0 01-4 4 4 4 0 01-4-4v-2a4 4 0 014-4zm-6-2a4 4 0 014-4H8a4 4 0 01-4 4 4 4 0 014 4h2a4 4 0 01-4-4zm12 0a4 4 0 014-4h-2a4 4 0 01-4 4 4 4 0 014 4h2a4 4 0 01-4-4z"/>
+                        </svg>
+                      </div>
+                      <span class="text-[9px] font-bold text-flowly-textMuted uppercase tracking-widest font-sans">Authorized Supplier</span>
+                    </div>
+                    <span class="text-[9px] text-flowly-textMuted uppercase block mb-0.5 font-bold">Billed By:</span>
+                    <h2 id="doc-vendor-name" class="font-extrabold text-base text-flowly-textMain tracking-tight mb-0.5">Acme Office Supplies</h2>
+                    <p class="text-[10px] text-flowly-textMuted font-semibold leading-normal">
+                      21 Market Street<br />
+                      Denver, CO
+                    </p>
+                  </div>
+                  
+                  <div class="text-right">
+                    <span class="text-[9px] text-flowly-textMuted font-bold uppercase tracking-widest block mb-1">Invoice Statement</span>
+                    <h1 id="doc-invoice-number" class="font-mono font-extrabold text-flowly-textMain text-sm">INV-1042</h1>
+                    
+                    <div class="text-[10px] text-flowly-textMuted space-y-0.5 mt-2 font-semibold">
+                      <div>Issued: <span id="doc-issue-date" class="font-bold text-flowly-textMain">January 17, 2025</span></div>
+                      <div>Due Date: <span id="doc-due-date" class="font-bold text-flowly-textMain">January 31, 2025</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Bill to target -->
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 text-[11px]">
+                  <span class="text-[9px] text-flowly-textMuted uppercase font-bold tracking-widest block mb-0.5">Billed To:</span>
+                  <strong class="text-flowly-textMain font-bold block mb-0.5">Northstar Bookkeeping LLC</strong>
+                  <span class="text-flowly-textMuted font-semibold">418 Pine Avenue, Austin, TX</span>
+                </div>
+
+                <!-- Document Items Table -->
+                <table class="w-full text-left text-xs mb-5">
+                  <thead>
+                    <tr class="border-b border-slate-200 text-[9px] font-bold text-flowly-textMuted uppercase tracking-wider">
+                      <th class="pb-1.5">Items/Service</th>
+                      <th class="pb-1.5 text-center w-12">Qty</th>
+                      <th class="pb-1.5 text-right w-16">Unit Price</th>
+                      <th class="pb-1.5 text-right w-20">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody id="doc-items-tbody">
+                    <!-- Loaded via JavaScript -->
+                  </tbody>
+                </table>
+
+                <!-- Grand Summary area -->
+                <div class="w-52 ml-auto space-y-1.5 border-t border-slate-200 pt-3 text-xs">
+                  <div class="flex justify-between text-flowly-textMuted font-bold text-[11px]">
+                    <span>Subtotal</span>
+                    <span id="doc-subtotal" class="font-mono text-flowly-textMain font-bold">$449.50</span>
+                  </div>
+                  <div class="flex justify-between text-flowly-textMuted font-bold text-[11px]">
+                    <span>Tax (10%)</span>
+                    <span id="doc-tax" class="font-mono text-flowly-textMain font-bold">$44.95</span>
+                  </div>
+                  <div class="flex justify-between text-flowly-textMain font-extrabold text-xs border-t-2 border-flowly-textMain pt-2 mt-1">
+                    <span>Grand Total</span>
+                    <span id="doc-total" class="font-mono">$494.45</span>
+                  </div>
+                </div>
+
+                <!-- Footer disclaimer on invoice page -->
+                <div class="mt-8 border-t border-slate-200 pt-3 text-center">
+                  <span class="text-[8px] text-slate-400 font-bold uppercase tracking-widest block">Docling Layout Parser Standard &middot; Auto-validated</span>
+                </div>
+
+              </article>
+            </div>
+        </div>
+
+        <!-- RIGHT WORKSPACE: Segmented Form Controls - 7 of 12 Column block -->
+        <div class="lg:col-span-7 flex flex-col overflow-hidden h-full">
+          <div class="bg-white rounded-2xl border border-flowly-border flex flex-col overflow-hidden h-full shadow-md">
+            
+            <!-- Exact Segmented Pill Switcher styled after Flowly image header controls -->
+            <div class="flex items-center justify-between border-b border-flowly-border bg-slate-50 px-6 py-3">
+              <div class="flex bg-slate-200/70 p-1 rounded-xl border border-flowly-border/70">
+                <button onclick="switchTab('tab-general')" id="btn-tab-general" class="tab-button px-4 py-1.5 text-xs font-bold rounded-lg bg-white text-flowly-textMain shadow-3xs transition-all hover:text-spruce-700">
+                  Invoice Detail
+                </button>
+                <button onclick="switchTab('tab-duplicate')" id="btn-tab-duplicate" class="tab-button px-4 py-1.5 text-xs font-bold rounded-lg text-flowly-textMuted hover:text-spruce-700 transition-all flex items-center gap-2">
+                  Duplicate Audit
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block"></span>
+                </button>
+                <button onclick="switchTab('tab-checks')" id="btn-tab-checks" class="tab-button px-4 py-1.5 text-xs font-bold rounded-lg text-flowly-textMuted hover:text-spruce-700 transition-all">
+                  Checks &amp; Log
+                </button>
+              </div>
+              
+              <div class="flex items-center gap-1.5 text-[10px] font-mono font-semibold text-flowly-textMuted">
+                <span>Model: <strong class="text-slate-700">Docling Engine</strong></span>
+              </div>
+            </div>
+
+            <!-- TAB DATA PANEL -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+
+              <!-- ALERT CALLOUT: Muted gray card with spruce left accent line -->
+              <div class="bg-[#F8F9FA] border border-flowly-border border-l-4 border-l-spruce-700 rounded-xl p-4 flex items-center justify-between gap-3 hover:bg-spruce-50/20 transition-colors">
+                <div class="flex gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-slate-100 border border-flowly-border/60 flex items-center justify-center text-slate-700 flex-shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                  </div>
+                  <div>
+                    <h4 class="text-xs font-bold text-flowly-textMain">Duplicate Match Indicator</h4>
+                    <p class="text-[11px] text-flowly-textMuted mt-0.5 font-medium">Identical records are active for <span class="font-bold font-mono text-slate-700">INV-1042</span> within past monthly cycle.</p>
+                  </div>
+                </div>
+                <button onclick="switchTab('tab-duplicate')" class="text-xs font-bold text-spruce-700 underline hover:text-spruce-900 whitespace-nowrap transition-colors">
+                  Audit Match &rarr;
+                </button>
+              </div>
+
+              <!-- TAB 1: FORM FIELDS -->
+              <div id="tab-general" class="tab-content space-y-6 block">
+                
+                <div>
+                  <h3 class="text-xs font-bold uppercase tracking-widest text-flowly-textMuted mb-4">Invoice Information</h3>
+                  
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Vendor Name (Spans whole row) -->
+                    <div class="sm:col-span-2 space-y-1.5">
+                      <label class="text-xs font-bold text-flowly-textMuted flex justify-between">
+                        <span>Vendor Name</span>
+                        <span class="text-spruce-700 font-bold bg-spruce-50 border border-spruce-100 px-1.5 py-0.5 rounded text-[10px]">94% confidence</span>
+                      </label>
+                      <input type="text" id="input-vendor" value="Acme Office Supplies" onfocus="focusField('vendor')" oninput="updatePreview('vendor', this.value)" class="w-full text-xs px-3.5 py-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-spruce-700 focus:border-spruce-700 transition-all font-semibold text-flowly-textMain" />
+                    </div>
+
+                    <!-- Invoice No -->
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-bold text-flowly-textMuted flex justify-between">
+                        <span>Invoice Number</span>
+                        <span class="text-spruce-700 font-bold bg-spruce-50 border border-spruce-100 px-1.5 py-0.5 rounded text-[10px]">91% confidence</span>
+                      </label>
+                      <input type="text" id="input-invoice" value="INV-1042" onfocus="focusField('invoice_no')" oninput="updatePreview('invoice_no', this.value)" class="w-full text-xs px-3.5 py-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-spruce-700 focus:border-spruce-700 transition-all font-mono font-semibold text-flowly-textMain" />
+                    </div>
+
+                    <!-- Currency selection -->
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-bold text-flowly-textMuted">Currency</label>
+                      <div class="relative">
+                        <select id="input-currency" class="w-full text-xs px-3.5 py-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-spruce-700 focus:border-spruce-700 transition-all font-semibold text-flowly-textMain appearance-none cursor-pointer">
+                          <option value="USD">USD ($)</option>
+                          <option value="EUR">EUR (€)</option>
+                          <option value="GBP">GBP (£)</option>
+                        </select>
+                        <span class="absolute right-3.5 inset-y-0 flex items-center pointer-events-none text-slate-400">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Date issued -->
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-bold text-flowly-textMuted flex justify-between">
+                        <span>Date Issued</span>
+                        <span class="text-spruce-700 font-bold bg-spruce-50 border border-spruce-100 px-1.5 py-0.5 rounded text-[10px]">86% confidence</span>
+                      </label>
+                      <div class="relative">
+                        <input type="text" id="input-date" value="January 17, 2025" onfocus="focusField('invoice_date')" oninput="updatePreview('invoice_date', this.value)" class="w-full text-xs pl-3.5 pr-10 py-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-spruce-700 focus:border-spruce-700 transition-all font-semibold text-flowly-textMain" />
+                        <span class="absolute right-3.5 inset-y-0 flex items-center pointer-events-none text-slate-400">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Date due (Muted gray warning indicator, completely matching spec) -->
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-bold text-flowly-textMuted flex justify-between">
+                        <span>Due Date</span>
+                        <span class="text-slate-500 font-bold bg-slate-100 border border-flowly-border px-1.5 py-0.5 rounded text-[10px]">Requires verification (72%)</span>
+                      </label>
+                      <div class="relative">
+                        <input type="text" id="input-due" value="January 31, 2025" onfocus="focusField('due_date')" oninput="updatePreview('due_date', this.value)" class="w-full text-xs pl-3.5 pr-10 py-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-spruce-700 focus:border-spruce-700 transition-all font-semibold text-flowly-textMain" />
+                        <span class="absolute right-3.5 inset-y-0 flex items-center pointer-events-none text-slate-400">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Subtotal -->
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-bold text-flowly-textMuted">Subtotal ($)</label>
+                      <input type="text" id="input-subtotal" value="449.50" onfocus="focusField('subtotal')" oninput="updateTotalsDirectly()" class="w-full text-xs px-3.5 py-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-spruce-700 focus:border-spruce-700 transition-all font-mono font-bold text-flowly-textMain" />
+                    </div>
+
+                    <!-- Tax -->
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-bold text-flowly-textMuted">Tax (10%)</label>
+                      <input type="text" id="input-tax" value="44.95" onfocus="focusField('tax')" oninput="updateTotalsDirectly()" class="w-full text-xs px-3.5 py-2.5 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-spruce-700 focus:border-spruce-700 transition-all font-mono font-bold text-flowly-textMain" />
+                    </div>
+
+                    <!-- Grand Total (Subtle verification alert styling) -->
+                    <div class="sm:col-span-2 space-y-1.5">
+                      <label class="text-xs font-bold text-flowly-textMain flex justify-between">
+                        <span>Grand Total</span>
+                        <span class="text-slate-500 font-bold bg-slate-100 border border-flowly-border px-1.5 py-0.5 rounded text-[10px]">Verify OCR Match</span>
+                      </label>
+                      <div class="relative">
+                        <input type="text" id="input-total" value="494.45" onfocus="focusField('total')" oninput="updatePreview('total', '$' + this.value)" class="w-full text-xs pl-3.5 pr-10 py-3 bg-[#F5F7F8] hover:bg-[#EFF1F3] border border-flowly-border rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-spruce-700 focus:border-spruce-700 transition-all font-mono font-extrabold text-flowly-textMain text-sm" />
+                        <span class="absolute right-3.5 inset-y-0 flex items-center text-slate-400 pointer-events-none">
+                          <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- TABLE EDIT: Spreadsheet grid matching layout -->
+                <div>
+                  <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-flowly-textMuted">Invoice Items/Service</h3>
+                    <button class="text-xs font-bold text-spruce-700 hover:text-spruce-900 flex items-center gap-1 bg-spruce-50 border border-spruce-100 hover:bg-spruce-100 px-2.5 py-1 rounded-lg transition-all" onclick="addLineItem()">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                      Add New Item
+                    </button>
+                  </div>
+                  
+                  <div class="border border-flowly-border rounded-xl overflow-hidden bg-white shadow-2xs">
+                    <table class="w-full text-xs text-left">
+                      <thead class="bg-slate-50 border-b border-flowly-border text-flowly-textMuted font-bold uppercase text-[9px] tracking-wider">
+                        <tr>
+                          <th class="p-3">Items/Service</th>
+                          <th class="p-3 text-center w-20">Quantity</th>
+                          <th class="p-3 text-right w-24">Unit Price</th>
+                          <th class="p-3 text-right w-24">Total</th>
+                          <th class="p-3 text-center w-12"></th>
+                        </tr>
+                      </thead>
+                      <tbody id="line-items-tbody">
+                        <!-- Item Row 1 -->
+                        <tr class="line-item-row border-b border-flowly-border hover:bg-spruce-50/30 transition-colors">
+                          <td class="p-2">
+                            <input type="text" value="Printer paper case" class="w-full py-1.5 px-2.5 border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+                          </td>
+                          <td class="p-2">
+                            <input type="number" value="6" class="qty-input w-full py-1.5 px-1.5 text-center border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-mono font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+                          </td>
+                          <td class="p-2">
+                            <input type="text" value="32.00" class="rate-input w-full py-1.5 px-2 text-right border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-mono font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+                          </td>
+                          <td class="p-3 text-right font-mono font-bold text-flowly-textMain amount-display">
+                            $192.00
+                          </td>
+                          <td class="p-2 text-center">
+                            <button onclick="removeLineItem(this)" class="text-slate-400 hover:text-spruce-700 p-1 rounded-lg hover:bg-spruce-100 transition-all">
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                          </td>
+                        </tr>
+                        <!-- Item Row 2 -->
+                        <tr class="line-item-row border-b border-flowly-border hover:bg-spruce-50/30 transition-colors">
+                          <td class="p-2">
+                            <input type="text" value="Toner cartridge" class="w-full py-1.5 px-2.5 border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+                          </td>
+                          <td class="p-2">
+                            <input type="number" value="2" class="qty-input w-full py-1.5 px-1.5 text-center border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-mono font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+                          </td>
+                          <td class="p-2">
+                            <input type="text" value="119.00" class="rate-input w-full py-1.5 px-2 text-right border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-mono font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+                          </td>
+                          <td class="p-3 text-right font-mono font-bold text-flowly-textMain amount-display">
+                            $238.00
+                          </td>
+                          <td class="p-2 text-center">
+                            <button onclick="removeLineItem(this)" class="text-slate-400 hover:text-spruce-700 p-1 rounded-lg hover:bg-spruce-100 transition-all">
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                          </td>
+                        </tr>
+                        <!-- Item Row 3 -->
+                        <tr class="line-item-row border-b border-flowly-border hover:bg-spruce-50/30 transition-colors">
+                          <td class="p-2">
+                            <input type="text" value="Delivery" class="w-full py-1.5 px-2.5 border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+                          </td>
+                          <td class="p-2">
+                            <input type="number" value="1" class="qty-input w-full py-1.5 px-1.5 text-center border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-mono font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+                          </td>
+                          <td class="p-2">
+                            <input type="text" value="19.50" class="rate-input w-full py-1.5 px-2 text-right border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-mono font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+                          </td>
+                          <td class="p-3 text-right font-mono font-bold text-flowly-textMain amount-display">
+                            $19.50
+                          </td>
+                          <td class="p-2 text-center">
+                            <button onclick="removeLineItem(this)" class="text-slate-400 hover:text-spruce-700 p-1 rounded-lg hover:bg-spruce-100 transition-all">
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- TAB 2: AUDIT METRICS -->
+              <div id="tab-duplicate" class="tab-content space-y-4 hidden">
+                <div class="border border-flowly-border rounded-xl p-5 bg-slate-50 space-y-4">
+                  <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-flowly-textMuted">Data Reconciliation</h3>
+                    <span class="text-[10px] bg-slate-100 text-flowly-textMain font-bold border border-flowly-border px-2 py-0.5 rounded-full">System Variance Detected</span>
+                  </div>
+                  
+                  <p class="text-xs text-flowly-textMuted leading-relaxed">Our duplicate checker identified a matching archive with high overlap attributes. Please review the variance metrics:</p>
+
+                  <div class="bg-white border border-flowly-border rounded-xl overflow-hidden shadow-3xs">
+                    <div class="grid grid-cols-4 bg-slate-50 border-b border-flowly-border p-3 text-[9px] font-bold text-flowly-textMuted uppercase tracking-wider text-center">
+                      <div class="text-left pl-2">Attribute</div>
+                      <div>Current Extraction</div>
+                      <div>Archive Match</div>
+                      <div>Result</div>
+                    </div>
+                    
+                    <div class="divide-y divide-flowly-border">
+                      <div class="grid grid-cols-4 p-3 items-center text-xs text-center">
+                        <div class="text-left font-bold text-slate-500 pl-2">Invoice No</div>
+                        <div class="font-mono font-bold text-flowly-textMain">INV-1042</div>
+                        <div class="font-mono text-flowly-textMuted">INV-1042</div>
+                        <div class="flex items-center justify-center gap-1.5">
+                          <span class="w-1.5 h-1.5 rounded-full bg-spruce-700"></span>
+                          <span class="text-[10px] font-bold text-spruce-700">Match</span>
+                        </div>
+                      </div>
+                      
+                      <div class="grid grid-cols-4 p-3 items-center text-xs text-center">
+                        <div class="text-left font-bold text-slate-500 pl-2">Amount</div>
+                        <div class="font-mono font-bold text-flowly-textMain">$494.45</div>
+                        <div class="font-mono text-flowly-textMuted">$494.45</div>
+                        <div class="flex items-center justify-center gap-1.5">
+                          <span class="w-1.5 h-1.5 rounded-full bg-spruce-700"></span>
+                          <span class="text-[10px] font-bold text-spruce-700">Match</span>
+                        </div>
+                      </div>
+
+                      <div class="grid grid-cols-4 p-3 items-center text-xs text-center">
+                        <div class="text-left font-bold text-slate-500 pl-2">Issue Date</div>
+                        <div class="font-semibold text-flowly-textMain">Jan 17, 2025</div>
+                        <div class="font-semibold text-flowly-textMuted">Jan 16, 2025</div>
+                        <div class="flex items-center justify-center gap-1.5">
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                          <span class="text-[10px] font-bold text-flowly-textMuted">1d Shift</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-2 pt-2">
+                    <button class="px-4 py-2 bg-spruce-700 hover:bg-spruce-800 hover:shadow-md hover:shadow-spruce-700/10 text-white text-xs font-bold rounded-xl transition-all" onclick="triggerToast('Marked as unique and approved!')">
+                      Mark as Unique Document
+                    </button>
+                    <button class="px-4 py-2 bg-slate-100 border border-flowly-border hover:bg-slate-200 text-flowly-textMain text-xs font-bold rounded-xl transition-all" onclick="triggerToast('Loading matched duplicate...')">
+                      Load Comparison Panel
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- TAB 3: PIPELINE LOGS & RUNTIME VALIDATIONS -->
+              <div id="tab-checks" class="tab-content space-y-6 hidden">
+                <div>
+                  <h3 class="text-xs font-bold uppercase tracking-widest text-flowly-textMuted mb-3">Model Checks</h3>
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between p-3 bg-slate-50 border border-flowly-border rounded-xl">
+                      <div class="flex items-center gap-2.5">
+                        <svg class="w-4 h-4 text-spruce-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                        <span class="text-xs font-semibold text-flowly-textMain">Sum verification check: items tally with total lines</span>
+                      </div>
+                      <span class="text-[9px] bg-spruce-50 text-spruce-800 font-bold px-1.5 py-0.5 rounded border border-spruce-100">Verified</span>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 bg-slate-50 border border-flowly-border rounded-xl">
+                      <div class="flex items-center gap-2.5">
+                        <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
+                        <span class="text-xs font-semibold text-flowly-textMain">Due date threshold meets default review compliance</span>
+                      </div>
+                      <span class="text-[9px] bg-slate-100 text-flowly-textMuted font-bold px-1.5 py-0.5 rounded border border-flowly-border">Requires Review</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 class="text-xs font-bold uppercase tracking-widest text-flowly-textMuted mb-3">Audit Trails</h3>
+                  <div class="border border-flowly-border rounded-xl overflow-hidden bg-slate-50 divide-y divide-flowly-border font-mono text-2xs p-1">
+                    <div class="p-3 flex justify-between bg-white rounded-lg">
+                      <span class="text-flowly-textMuted">09:41:02</span>
+                      <span class="font-semibold text-flowly-textMain">OCR document structure model mapped 5 tables</span>
+                    </div>
+                    <div class="p-3 flex justify-between bg-white rounded-lg">
+                      <span class="text-flowly-textMuted">09:41:04</span>
+                      <span class="font-semibold text-flowly-textMain">String similarity index matching 98% (Vendor Directory)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Footer status line inside Form panel -->
+            <div class="bg-slate-50 border-t border-flowly-border px-6 py-4 flex items-center justify-between text-[11px] text-flowly-textMuted">
+              <div class="flex items-center gap-2 font-medium">
+                <span class="w-2 h-2 rounded-full bg-spruce-700 inline-block"></span>
+                <span>Active Core: <strong class="text-flowly-textMain font-bold">Flowly-Tidy AI Engine v4</strong></span>
+              </div>
+              <span>Processing latency: <strong class="text-flowly-textMain font-semibold">142ms</strong></span>
+            </div>
+
+          </div>
+        </div>
+
+      </section>
+    </main>
+
+  </div>
+
+  <script>
+    // In-memory data structures for queue items
+    const invoiceQueue = [
+      {
+        id: "INV-1042",
+        queuePos: "3 of 18",
+        vendor: "Acme Office Supplies",
+        total: "$494.45",
+        invoiceNo: "INV-1042",
+        issueDate: "January 17, 2025",
+        dueDate: "January 31, 2025",
+        subtotal: "449.50",
+        tax: "44.95",
+        items: [
+          { desc: "Printer paper case", qty: 6, rate: 32.00 },
+          { desc: "Toner cartridge", qty: 2, rate: 119.00 },
+          { desc: "Delivery", qty: 1, rate: 19.50 }
+        ]
+      },
+      {
+        id: "INV-9982",
+        queuePos: "4 of 18",
+        vendor: "TechPlanet Corporation",
+        total: "$1,265.00",
+        invoiceNo: "TP-9982",
+        issueDate: "January 24, 2025",
+        dueDate: "February 15, 2025",
+        subtotal: "1150.00",
+        tax: "115.00",
+        items: [
+          { desc: "Enterprise Server Rack Unit", qty: 1, rate: 950.00 },
+          { desc: "Premium Fiber Optic Loom", qty: 4, rate: 50.00 },
+          { desc: "On-site Deployment Support", qty: 1, rate: 100.00 }
+        ]
+      }
+    ];
+
+    let currentQueueIndex = 0;
+
+    // Physical coordinate mapping bounding boxes (percentages relative to parent container `#invoice-paper`)
+    const coordinateMap = {
+      vendor: { top: '8%', left: '4%', width: '56%', height: '14%' },
+      invoice_no: { top: '8%', left: '70%', width: '26%', height: '8%' },
+      invoice_date: { top: '16%', left: '68%', width: '28%', height: '4%' },
+      due_date: { top: '20%', left: '68%', width: '28%', height: '4%' },
+      subtotal: { top: '75%', left: '55%', width: '42%', height: '3.5%' },
+      tax: { top: '78%', left: '55%', width: '42%', height: '3.5%' },
+      total: { top: '81%', left: '55%', width: '42%', height: '6%' }
+    };
+
+    // Initialize document state
+    window.addEventListener('DOMContentLoaded', () => {
+      focusField('vendor');
+      recalcLineItems();
+    });
+
+    // Custom Toast notifications
+    function triggerToast(message, isSuccess = true) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-message');
+      const toastCheck = document.getElementById('toast-check');
+      const toastSpinner = document.getElementById('toast-spinner');
+
+      toastMsg.innerText = message;
+      
+      if (isSuccess) {
+        toastCheck.classList.remove('hidden');
+        toastSpinner.classList.add('hidden');
+      } else {
+        toastCheck.classList.add('hidden');
+        toastSpinner.classList.remove('hidden');
+      }
+
+      toast.classList.remove('opacity-0', 'translate-y-[-20px]', 'pointer-events-none');
+      
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-[-20px]', 'pointer-events-none');
+      }, 3000);
+    }
+
+    // Interactive Highlight positioning logic
+    function focusField(fieldName) {
+      const highlight = document.getElementById('active-highlight');
+      const coords = coordinateMap[fieldName];
+      
+      if (coords) {
+        highlight.style.top = coords.top;
+        highlight.style.left = coords.left;
+        highlight.style.width = coords.width;
+        highlight.style.height = coords.height;
+        highlight.style.opacity = '1';
+      }
+    }
+
+    // Real-time synchronization of form values to invoice preview
+    function updatePreview(fieldId, value) {
+      const targetMap = {
+        'vendor': 'doc-vendor-name',
+        'invoice_no': 'doc-invoice-number',
+        'invoice_date': 'doc-issue-date',
+        'due_date': 'doc-due-date',
+        'total': 'doc-total'
+      };
+
+      const targetId = targetMap[fieldId];
+      if (targetId) {
+        document.getElementById(targetId).innerText = value;
+      }
+      
+      // Update top bar vendor title if vendor changes
+      if (fieldId === 'vendor') {
+        document.getElementById('topbar-vendor-title').firstChild.textContent = value + ' ';
+      }
+    }
+
+    // Tab switching engine
+    function switchTab(tabId) {
+      // Hide all content
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.add('hidden');
+        tab.classList.remove('block');
+      });
+      
+      // Show target
+      const target = document.getElementById(tabId);
+      target.classList.remove('hidden');
+      target.classList.add('block');
+
+      // Update button styles
+      document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('bg-white', 'text-flowly-textMain', 'shadow-3xs');
+        btn.classList.add('text-flowly-textMuted');
+      });
+
+      const activeBtn = document.getElementById('btn-' + tabId);
+      activeBtn.classList.add('bg-white', 'text-flowly-textMain', 'shadow-3xs');
+      activeBtn.classList.remove('text-flowly-textMuted');
+    }
+
+    // Line item calculation logic
+    function recalcLineItems() {
+      const rows = document.querySelectorAll('.line-item-row');
+      const previewTbody = document.getElementById('doc-items-tbody');
+      previewTbody.innerHTML = '';
+      
+      let subtotal = 0;
+
+      rows.forEach(row => {
+        const desc = row.querySelector('input[type="text"]').value;
+        const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+        const rate = parseFloat(row.querySelector('.rate-input').value) || 0;
+        const amount = qty * rate;
+        
+        subtotal += amount;
+
+        // Update row total display
+        row.querySelector('.amount-display').innerText = '$' + amount.toFixed(2);
+
+        // Add to preview table
+        const previewRow = document.createElement('tr');
+        previewRow.className = 'border-b border-slate-100 last:border-0';
+        previewRow.innerHTML = `
+          <td class="py-2 font-semibold text-flowly-textMain">${desc}</td>
+          <td class="py-2 text-center text-flowly-textMuted font-medium">${qty}</td>
+          <td class="py-2 text-right text-flowly-textMuted font-mono">$${rate.toFixed(2)}</td>
+          <td class="py-2 text-right font-bold font-mono">$${amount.toFixed(2)}</td>
+        `;
+        previewTbody.appendChild(previewRow);
+      });
+
+      // Update Summary Fields
+      const taxRate = 0.1;
+      const tax = subtotal * taxRate;
+      const total = subtotal + tax;
+
+      document.getElementById('input-subtotal').value = subtotal.toFixed(2);
+      document.getElementById('input-tax').value = tax.toFixed(2);
+      document.getElementById('input-total').value = total.toFixed(2);
+
+      document.getElementById('doc-subtotal').innerText = '$' + subtotal.toFixed(2);
+      document.getElementById('doc-tax').innerText = '$' + tax.toFixed(2);
+      document.getElementById('doc-total').innerText = '$' + total.toFixed(2);
+      
+      // Update header meta
+      const invNo = document.getElementById('input-invoice').value;
+      document.getElementById('topbar-inv-meta').innerText = `${invNo} · $${total.toFixed(2)}`;
+    }
+
+    function updateTotalsDirectly() {
+      const subtotal = parseFloat(document.getElementById('input-subtotal').value) || 0;
+      const tax = parseFloat(document.getElementById('input-tax').value) || 0;
+      const total = subtotal + tax;
+
+      document.getElementById('input-total').value = total.toFixed(2);
+      document.getElementById('doc-subtotal').innerText = '$' + subtotal.toFixed(2);
+      document.getElementById('doc-tax').innerText = '$' + tax.toFixed(2);
+      document.getElementById('doc-total').innerText = '$' + total.toFixed(2);
+    }
+
+    function addLineItem() {
+      const tbody = document.getElementById('line-items-tbody');
+      const newRow = document.createElement('tr');
+      newRow.className = 'line-item-row border-b border-flowly-border hover:bg-spruce-50/30 transition-colors';
+      newRow.innerHTML = `
+        <td class="p-2">
+          <input type="text" value="New Item/Service" class="w-full py-1.5 px-2.5 border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+        </td>
+        <td class="p-2">
+          <input type="number" value="1" class="qty-input w-full py-1.5 px-1.5 text-center border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-mono font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+        </td>
+        <td class="p-2">
+          <input type="text" value="0.00" class="rate-input w-full py-1.5 px-2 text-right border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-mono font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+        </td>
+        <td class="p-3 text-right font-mono font-bold text-flowly-textMain amount-display">
+          $0.00
+        </td>
+        <td class="p-2 text-center">
+          <button onclick="removeLineItem(this)" class="text-slate-400 hover:text-spruce-700 p-1 rounded-lg hover:bg-spruce-100 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(newRow);
+      recalcLineItems();
+    }
+
+    function removeLineItem(btn) {
+      const row = btn.closest('tr');
+      row.remove();
+      recalcLineItems();
+    }
+
+    // Approval cycle transition
+    function approveAndNext() {
+      triggerToast('Invoice approved! Loading next item...');
+      
+      setTimeout(() => {
+        currentQueueIndex = (currentQueueIndex + 1) % invoiceQueue.length;
+        loadInvoiceData(invoiceQueue[currentQueueIndex]);
+      }, 1500);
+    }
+
+    // Sidebar toggle engine
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const toggleIcon = document.getElementById('sidebar-toggle-icon');
+      const footer = document.getElementById('sidebar-footer');
+      const isExpanded = sidebar.classList.contains('w-64');
+
+      if (isExpanded) {
+        // Collapse
+        sidebar.classList.replace('w-64', 'w-20');
+        sidebar.classList.add('sidebar-collapsed');
+        footer.classList.replace('p-4', 'p-3');
+        toggleIcon.classList.add('rotate-180');
+      } else {
+        // Expand
+        sidebar.classList.replace('w-20', 'w-64');
+        sidebar.classList.remove('sidebar-collapsed');
+        footer.classList.replace('p-3', 'p-4');
+        toggleIcon.classList.remove('rotate-180');
+      }
+    }
+
+    function loadInvoiceData(data) {
+      // Update UI elements from data object
+      document.getElementById('input-vendor').value = data.vendor;
+      document.getElementById('input-invoice').value = data.id;
+      document.getElementById('input-date').value = data.issueDate;
+      document.getElementById('input-due').value = data.dueDate;
+      
+      // Update preview text
+      updatePreview('vendor', data.vendor);
+      updatePreview('invoice_no', data.id);
+      updatePreview('invoice_date', data.issueDate);
+      updatePreview('due_date', data.dueDate);
+
+      // Rebuild items
+      const tbody = document.getElementById('line-items-tbody');
+      tbody.innerHTML = '';
+      data.items.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'line-item-row border-b border-flowly-border hover:bg-spruce-50/30 transition-colors';
+        row.innerHTML = `
+          <td class="p-2">
+            <input type="text" value="${item.desc}" class="w-full py-1.5 px-2.5 border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+          </td>
+          <td class="p-2">
+            <input type="number" value="${item.qty}" class="qty-input w-full py-1.5 px-1.5 text-center border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-mono font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+          </td>
+          <td class="p-2">
+            <input type="text" value="${item.rate.toFixed(2)}" class="rate-input w-full py-1.5 px-2 text-right border border-transparent hover:border-slate-300 hover:bg-white focus:bg-white focus:border-spruce-700 rounded-lg transition-all font-mono font-semibold text-flowly-textMain bg-[#F5F7F8]" oninput="recalcLineItems()" />
+          </td>
+          <td class="p-3 text-right font-mono font-bold text-flowly-textMain amount-display">
+            $${(item.qty * item.rate).toFixed(2)}
+          </td>
+          <td class="p-2 text-center">
+            <button onclick="removeLineItem(this)" class="text-slate-400 hover:text-spruce-700 p-1 rounded-lg hover:bg-spruce-100 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      recalcLineItems();
+      
+      // Update queue position display
+      document.getElementById('queue-position-display').innerText = data.queuePos;
+    }
+  </script>
+</body>
+</html>

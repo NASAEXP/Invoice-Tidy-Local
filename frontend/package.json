@@ -1,0 +1,10 @@
+{
+  "name": "invoice-tidy-local-frontend",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/tw-input.css -o ./src/vendor/tailwind.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

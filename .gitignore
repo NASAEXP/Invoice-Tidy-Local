@@ -1,0 +1,26 @@
+# Wails Build Directories
+build/bin/
+frontend/node_modules/
+
+# Python Local Tools & AI Cache (venv + downloaded models, ~10GB)
+local-tools/
+scripts/__pycache__/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.pyc
+
+# Compiled desktop binary (ship via GitHub Releases, not the repo)
+*.exe
+
+# Debug screenshots / dev artifacts
+line-items-*.png
+
+# Local agent / editor tooling
+.agents/
+.codex/
+.playwright-mcp/
+skills-lock.json
+
+# Internal planning doc (contains local paths)
+implementation_plan.md
