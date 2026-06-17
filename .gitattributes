@@ -1,0 +1,10 @@
+# Normalize line endings: commit LF, check out native.
+* text=auto
+
+# Keep Windows-native tooling as CRLF on checkout.
+*.ps1 text eol=crlf
+
+# Treat binaries as binary (no EOL/diff munging).
+*.png binary
+*.ico binary
+*.exe binary
