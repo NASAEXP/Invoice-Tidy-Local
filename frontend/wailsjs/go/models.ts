@@ -166,6 +166,22 @@ export namespace main {
 	        this.count = source["count"];
 	    }
 	}
+	export class LocalPaths {
+	    sqlitePath: string;
+	    documentsDir: string;
+	    daemonLogPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LocalPaths(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sqlitePath = source["sqlitePath"];
+	        this.documentsDir = source["documentsDir"];
+	        this.daemonLogPath = source["daemonLogPath"];
+	    }
+	}
 	export class ModelStatus {
 	    ok: boolean;
 	    worker: string;

@@ -441,6 +441,9 @@ func (w *WorkerManager) monitorLoop(ctx context.Context) {
 					w.port = port
 					w.token = w.generateSecureToken()
 					if err := w.spawnProcess(port); err == nil {
+						// ponytail: Shutdown() above cleared w.running; restore it
+						// or this loop exits and we never recover a 2nd crash.
+						w.running = true
 						consecutiveFailures = 0
 						continue
 					}

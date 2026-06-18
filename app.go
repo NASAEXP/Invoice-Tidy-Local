@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -491,6 +492,26 @@ func (a *App) deleteDocumentByID(documentID string) error {
 	return a.db.DeleteDocument(documentID)
 }
 
+// csvSafe neutralizes spreadsheet formula injection. A cell beginning with
+// =, +, -, @, tab, or CR can execute as a formula when the CSV is opened in
+// Excel/Sheets, and invoice values are OCR'd from untrusted files. Genuine
+// numbers (including negative totals / credit memos) are left intact; anything
+// else that starts with a trigger char is prefixed with a quote so it stays
+// inert text.
+func csvSafe(s string) string {
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		if _, err := strconv.ParseFloat(strings.TrimSpace(s), 64); err == nil {
+			return s // real number, safe to leave as-is
+		}
+		return "'" + s
+	}
+	return s
+}
+
 // 14. Export Approved Invoice Data to Excel-Friendly CSV
 func (a *App) ExportCSV() (ExportResponse, error) {
 	if a.db == nil {
@@ -567,16 +588,16 @@ func (a *App) ExportCSV() (ExportResponse, error) {
 	// Headers
 	headers := []string{"File Name", "Status"}
 	for _, vf := range visibleFields {
-		headers = append(headers, vf.ExportColumn)
+		headers = append(headers, csvSafe(vf.ExportColumn))
 	}
 	writer.Write(headers)
 
 	// Rows
 	for _, d := range approvedDocs {
-		row := []string{d.SourceFileName, d.Status}
+		row := []string{csvSafe(d.SourceFileName), csvSafe(d.Status)}
 		for _, vf := range visibleFields {
 			val := d.Fields[vf.FieldKey]
-			row = append(row, val)
+			row = append(row, csvSafe(val))
 		}
 		writer.Write(row)
 

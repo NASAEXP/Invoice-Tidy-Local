@@ -14,6 +14,8 @@ export function GetCompatibility():Promise<main.CompatibilityReport>;
 
 export function GetDaemonLogs():Promise<string>;
 
+export function GetLocalPaths():Promise<main.LocalPaths>;
+
 export function GetModelStatus():Promise<main.ModelStatus>;
 
 export function GetProcessingStatus():Promise<main.ProcessingStatus>;

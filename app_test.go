@@ -185,3 +185,66 @@ func testDocumentForDelete(id string, hash string, storagePath string) Document 
 	doc.SourceFileName = filepath.Base(storagePath)
 	return doc
 }
+
+func TestCSVSafeNeutralizesFormulasButKeepsNumbers(t *testing.T) {
+	// Formula-trigger cells (not valid numbers) must be quoted inert.
+	dangerous := map[string]string{
+		"=1+1":              "'=1+1",
+		"+CMD()":            "'+CMD()",
+		"@SUM(A1)":          "'@SUM(A1)",
+		"=HYPERLINK(\"x\")": "'=HYPERLINK(\"x\")",
+		"\tleadtab":         "'\tleadtab",
+		"-2+3+cmd|' /C":     "'-2+3+cmd|' /C",
+	}
+	for in, want := range dangerous {
+		if got := csvSafe(in); got != want {
+			t.Fatalf("csvSafe(%q) = %q, want %q", in, got, want)
+		}
+	}
+
+	// Real values pass through untouched, including negative totals / credit memos.
+	safe := []string{"", "Acme Corp", "INV-1042", "482.10", "-50.00", "+5", "1234.56", "USD"}
+	for _, in := range safe {
+		if got := csvSafe(in); got != in {
+			t.Fatalf("csvSafe(%q) altered a safe value to %q", in, got)
+		}
+	}
+}
+
+func TestDeleteDocumentCascadesFieldValues(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+
+	mgr, err := NewDBManager()
+	if err != nil {
+		t.Fatalf("NewDBManager failed: %v", err)
+	}
+	defer mgr.Close()
+
+	root := t.TempDir()
+	storagePath := filepath.Join(root, "cascade.pdf")
+	if err := os.WriteFile(storagePath, []byte("invoice"), 0644); err != nil {
+		t.Fatalf("failed to create test storage file: %v", err)
+	}
+
+	doc := testDocumentForDelete("cascade-1", "hash-cascade", storagePath)
+	if err := mgr.SaveDocument(doc); err != nil {
+		t.Fatalf("SaveDocument failed: %v", err)
+	}
+	if err := mgr.SaveDocumentFieldValue(doc.ID, "total", "482.10", 0.9, "", ""); err != nil {
+		t.Fatalf("SaveDocumentFieldValue failed: %v", err)
+	}
+
+	if err := mgr.DeleteDocument(doc.ID); err != nil {
+		t.Fatalf("DeleteDocument failed: %v", err)
+	}
+
+	// Deleting a document must remove its field rows too; orphans here mean
+	// the child-row cleanup regressed.
+	var orphans int
+	if err := mgr.db.QueryRow("SELECT COUNT(*) FROM document_field_values WHERE document_id = ?", doc.ID).Scan(&orphans); err != nil {
+		t.Fatalf("orphan count query failed: %v", err)
+	}
+	if orphans != 0 {
+		t.Fatalf("expected field values to cascade-delete, found %d orphan rows", orphans)
+	}
+}

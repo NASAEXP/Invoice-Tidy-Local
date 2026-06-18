@@ -594,8 +594,30 @@ func (m *DBManager) SetDocumentStatus(docID string, status string) error {
 }
 
 func (m *DBManager) DeleteDocument(docID string) error {
-	_, err := m.db.Exec("DELETE FROM documents WHERE id = ?;", docID)
-	return err
+	// Explicit child cleanup in one transaction. ON DELETE CASCADE only fires
+	// when foreign_keys is enabled on the serving connection, which isn't
+	// guaranteed across the database/sql pool (the PRAGMA is per-connection).
+	// Deleting children explicitly means no orphan field/table/audit rows leak,
+	// regardless of which pooled connection runs the delete.
+	tx, err := m.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmts := []string{
+		"DELETE FROM document_field_values WHERE document_id = ?;",
+		"DELETE FROM document_tables WHERE document_id = ?;",
+		"DELETE FROM audit_events WHERE document_id = ?;",
+		"UPDATE documents SET duplicate_of = NULL WHERE duplicate_of = ?;",
+		"DELETE FROM documents WHERE id = ?;",
+	}
+	for _, stmt := range stmts {
+		if _, err := tx.Exec(stmt, docID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (m *DBManager) ListTemplateFields() ([]TemplateField, error) {

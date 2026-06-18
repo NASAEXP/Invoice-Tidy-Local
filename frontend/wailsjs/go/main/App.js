@@ -26,6 +26,10 @@ export function GetDaemonLogs() {
   return window['go']['main']['App']['GetDaemonLogs']();
 }
 
+export function GetLocalPaths() {
+  return window['go']['main']['App']['GetLocalPaths']();
+}
+
 export function GetModelStatus() {
   return window['go']['main']['App']['GetModelStatus']();
 }
