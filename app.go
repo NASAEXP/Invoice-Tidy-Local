@@ -801,15 +801,23 @@ func (a *App) processQueueItem(docID string) {
 		maxPolls = 420 // Standard can be slower on CPU, but should not hold a batch forever.
 		timeoutMessage = "Standard extraction timed out after 7 minutes"
 	}
+	// The one-time model download/warmup can take many minutes on a slow
+	// connection. While the worker reports "warming"/"starting" we pause the
+	// parse timeout — otherwise the first document gets marked failed mid-download
+	// — and show an honest "downloading models" message instead of the synthetic
+	// parsing bar. warmupSeconds is bounded so a genuinely hung download still
+	// fails eventually rather than looping forever.
+	warmupSeconds := 0
+	maxWarmupSeconds := 3600
 	for pollCount < maxPolls {
 		time.Sleep(1 * time.Second)
-		pollCount++
 		if !a.documentExists(docID) {
 			return
 		}
 
 		pollResp, err := a.wm.PollJob(jobID)
 		if err != nil {
+			pollCount++
 			// Show poll failures so the user knows it is still trying
 			if pollCount%10 == 0 {
 				a.broadcastQueueUpdate(docID, "processing", 0.30, fmt.Sprintf("Waiting for extraction response (%ds)...", pollCount))
@@ -817,6 +825,21 @@ func (a *App) processQueueItem(docID string) {
 			continue
 		}
 
+		// First-run model download/warmup: the worker stays "warming" while
+		// HuggingFace pulls the weights. Don't burn the parse timeout on it, and
+		// tell the truth about what's happening instead of faking a parse %.
+		if pollResp.Status == "running" {
+			if h, herr := a.wm.checkHealth(); herr == nil && h != nil && (h.Status == "warming" || h.Status == "starting") {
+				warmupSeconds++
+				if warmupSeconds >= maxWarmupSeconds {
+					break
+				}
+				a.broadcastQueueUpdate(docID, "processing", 0.20, fmt.Sprintf("Downloading models (one-time, ~2 GB) — %ds. First run only; this can take several minutes...", warmupSeconds))
+				continue
+			}
+		}
+
+		pollCount++
 		if pollResp.Status == "running" {
 			// Progress slowly advances from 0.40 to 0.80 over time
 			progress := 0.40 + float64(pollCount)*0.0007
